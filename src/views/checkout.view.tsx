@@ -11,7 +11,7 @@ import PaymentMethods from "../features/payment/components/payment-methods.compo
 
 const EmptyCartContainer = () => {
     return (
-        <div className="flex h-screen items-center justify-center bg-gray-50">
+        <div className="flex h-screen items-center w-full justify-center bg-gray-50">
             <EmptyCart
                 content={<Button size="lg" className="py-8" asChild>
                     <Link href="/pos">

@@ -1,3 +1,4 @@
+"use client"
 import { Input } from "@/shared/components/ui/input";
 import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -23,6 +24,7 @@ export default function SearchProduct({ className }: { className?: string }) {
             <Input
                 placeholder="Buscar productos..."
                 className="pl-8"
+                color=""
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
             />

@@ -1,9 +1,9 @@
 "use client"
 import { Card, CardContent } from "@/shared/components/ui/card";
-import { PlusCircle } from "lucide-react";
-import { type Product } from "../types/product.type";
 import formatCurrency from "@/shared/utils/formatCurrency.util";
+import { PlusCircle } from "lucide-react";
 import { memo } from "react";
+import { type Product } from "../types/product.type";
 import ProductImage from "./product-image.component";
 
 interface ProductProps {
@@ -29,10 +29,10 @@ const ProductCard = memo(({ product, addToCart }: ProductProps) => {
                     className="object-cover" />
             </div>
             <CardContent className="p-3">
-                <div>
-                    <h3 className="font-medium line-clamp-1">{product.name}</h3>
-                    <p className="text-sm text-muted-foreground">{formatCurrency(product.price)}</p>
-                </div>
+                <h3
+                    style={{ wordBreak: "break-word" }}
+                    className="font-medium text-start line-clamp-3 ">{product.name}</h3>
+                <p className="text-sm text-muted-foreground">{formatCurrency(product.price)}</p>
             </CardContent>
         </Card>
     )

@@ -3,7 +3,10 @@ import { createContext, useCallback, useContext, useState } from "react"
 
 export interface ProductFilter {
     search: string
-    category: string
+    category?: {
+        id: number,
+        subCategory?: number
+    }
 }
 
 interface ProductContextType {
@@ -14,7 +17,6 @@ interface ProductContextType {
 const ProductContext = createContext<ProductContextType>({
     filter: {
         search: "",
-        category: ""
     },
     setFilter: () => { }
 })
@@ -22,13 +24,13 @@ const ProductContext = createContext<ProductContextType>({
 export const useProductFilterContext = () => useContext(ProductContext)
 
 export default function ProductFilterProvider({ children }: { children: React.ReactNode }) {
-    const [filter, setFilter] = useState({
+    const [filter, setFilter] = useState<ProductFilter>({
         search: "",
-        category: ""
+        category: undefined
     })
 
     const handleSetFilter = useCallback((filter?: Partial<ProductFilter>) => {
-        if (!filter) return setFilter({ search: "", category: "" })
+        if (!filter) return setFilter({ search: "" })
         setFilter(prev => ({ ...prev, ...filter }))
     }, [])
 

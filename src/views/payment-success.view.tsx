@@ -17,7 +17,7 @@ export default function PaymentSuccess() {
     const { total } = getCalculatedCart()
 
     return (
-        <main className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
+        <main className="flex items-center w-full justify-center min-h-screen bg-gray-50 p-4">
             <div className="w-full max-w-md rounded-lg border flex flex-col gap-6 bg-white shadow-lg p-6">
                 <Ticket receipt_number="123" />
                 <div className="flex justify-between items-center">

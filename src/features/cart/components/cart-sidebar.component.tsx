@@ -2,6 +2,7 @@
 
 import OrderAmount from "@/features/order/components/order-amount.component"
 import { Button } from "@/shared/components/ui/button"
+import { ScrollArea } from "@/shared/components/ui/scroll-area"
 import { ShoppingCart } from "lucide-react"
 import Link from "next/link"
 import { useCart } from "../context/cart-context"
@@ -25,11 +26,12 @@ export default function CartSidebar() {
           {itemCount} items
         </span>
       </div>
-      <div className="flex-1 overflow-auto p-4">
-        {cart.length === 0 ?
-          <EmptyCart />
-          :
-          <div className="space-y-4">
+      {cart.length === 0 ?
+        <EmptyCart />
+        :
+        <ScrollArea
+          className="overflow-auto h-full">
+          <div className="space-y-4 h-full p-4">
             {cart.map((item) => (
               <ProductItemCart
                 key={item.id}
@@ -38,8 +40,8 @@ export default function CartSidebar() {
                 removeFromCart={removeFromCart} />
             ))}
           </div>
-        }
-      </div>
+        </ScrollArea>
+      }
       <div className="space-y-6 p-4">
         <OrderAmount />
         <Button

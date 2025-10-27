@@ -19,18 +19,29 @@ export type Database = {
           created_at: string
           id: number
           name: string
+          parent_id: number | null
         }
         Insert: {
           created_at?: string
           id?: number
           name: string
+          parent_id?: number | null
         }
         Update: {
           created_at?: string
           id?: number
           name?: string
+          parent_id?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "Category_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "Category"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       Config: {
         Row: {

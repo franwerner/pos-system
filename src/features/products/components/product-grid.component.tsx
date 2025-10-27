@@ -3,6 +3,7 @@ import { useCart } from "@/features/cart/context/cart-context"
 import useGetProducts from "../hooks/useGetProducts.hook"
 import { useProductFilterContext } from "../provider/product-filter.provider"
 import ProductCard from "./product-card.component"
+import { ScrollArea } from "@/shared/components/ui/scroll-area"
 
 
 export default function ProductGrid() {
@@ -13,8 +14,8 @@ export default function ProductGrid() {
   const { data: products } = useGetProducts(filter)
 
   return (
-    <div className="p-3 overflow-auto">
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+    <ScrollArea className="p-3 overflow-auto h-full">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
         {products?.map((product) => (
           <ProductCard
             key={product.id}
@@ -22,6 +23,6 @@ export default function ProductGrid() {
             addToCart={addToCart} />
         ))}
       </div>
-    </div>
+    </ScrollArea>
   )
 }
