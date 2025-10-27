@@ -3,7 +3,6 @@ import useGetConfig from "@/features/admin/hooks/useGetConfig.hook";
 import { CartProvider } from "@/features/cart/context/cart-context";
 import ProductFilterProvider from "@/features/products/provider/product-filter.provider";
 import { Loader } from "@/shared/components/loader.component";
-import { SidebarProvider } from "@/shared/components/ui/sidebar";
 
 export default function PosLayout({ children }: { children: React.ReactNode }) {
 
@@ -16,13 +15,11 @@ export default function PosLayout({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <SidebarProvider>
-            <ProductFilterProvider>
-                <CartProvider
-                    defaultPaymentMethod={data.default_payment}>
-                    {children}
-                </CartProvider>
-            </ProductFilterProvider>
-        </SidebarProvider>
+        <ProductFilterProvider>
+            <CartProvider
+                defaultPaymentMethod={data.default_payment}>
+                {children}
+            </CartProvider>
+        </ProductFilterProvider>
     )
 }

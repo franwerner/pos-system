@@ -5,7 +5,7 @@ import { ProductFilter } from "../provider/product-filter.provider"
 export default function useGetProducts(filter?: Partial<ProductFilter>) {
     return useQuery({
         queryKey: ['products', filter],
-        queryFn: () => {
+        queryFn: async () => {
             return productsData
         },
     })

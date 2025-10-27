@@ -4,6 +4,7 @@ import useGetProducts from "../hooks/useGetProducts.hook"
 import { useProductFilterContext } from "../provider/product-filter.provider"
 import ProductCard from "./product-card.component"
 import { ScrollArea } from "@/shared/components/ui/scroll-area"
+import { Loader } from "@/shared/components/loader.component"
 
 
 export default function ProductGrid() {
@@ -11,7 +12,9 @@ export default function ProductGrid() {
 
   const { filter } = useProductFilterContext()
 
-  const { data: products } = useGetProducts(filter)
+  const { data: products, isLoading } = useGetProducts(filter)
+
+  if (isLoading) return <Loader />
 
   return (
     <ScrollArea className="p-3 overflow-auto h-full">

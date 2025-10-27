@@ -1,7 +1,7 @@
 "use client"
 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/shared/components/ui/accordion"
-import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuSub, SidebarMenuSubItem } from "@/shared/components/ui/sidebar"
+import { Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuSub, SidebarMenuSubItem } from "@/shared/components/ui/sidebar"
 import { cn } from "@/shared/utils/cn.util"
 import { memo, useCallback } from "react"
 import { useGetCategories } from "../hooks/useGetCategories.hook"
@@ -118,7 +118,6 @@ export default function CategorySidebar() {
           }
         </Accordion>
       </SidebarContent>
-      <SidebarFooter />
     </Sidebar>
   )
 }

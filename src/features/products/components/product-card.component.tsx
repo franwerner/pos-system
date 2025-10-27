@@ -24,7 +24,7 @@ const ProductCard = memo(({ product, addToCart }: ProductProps) => {
                 </div>
                 <ProductImage
                     fill
-                    src={product.img_url || "/placeholder.svg"}
+                    src={product.img_url}
                     alt={product.name}
                     className="object-cover" />
             </div>

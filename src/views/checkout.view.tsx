@@ -6,8 +6,8 @@ import Linker from "@/shared/components/linker.component"
 import { Button } from "@/shared/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
-import OrderSummary from "../features/order/components/order-summary.component"
-import PaymentMethods from "../features/payment/components/payment-methods.component"
+import OrderSummary from "@/features/order/components/order-summary.component"
+import PaymentMethods from "@/features/payment/components/payment-methods.component"
 
 const EmptyCartContainer = () => {
     return (
@@ -55,7 +55,7 @@ export default function CheckoutView() {
                         <h2 className="mb-4 text-xl font-semibold text-gray-800">Método de pago</h2>
                         <PaymentMethods />
                         <Button asChild size="lg" className="mt-6 py-8 w-full">
-                            <Linker href="checkout/success">Completar pago</Linker>
+                            <Linker href="/pos/order/1">Completar pago</Linker>
                         </Button>
                     </div>
                 </div>

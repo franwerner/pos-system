@@ -5,6 +5,7 @@ import { Product } from "@/features/products/types/product.type"
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react"
 import { Payment } from "../../payment/types/payment.type"
 import { calculateCart } from "../services/calculateCart.service"
+import { Order } from "@/features/order/types/order.type"
 
 
 export interface ProductCartItem extends Product {
@@ -13,6 +14,7 @@ export interface ProductCartItem extends Product {
 
 interface CartContextType {
   cart: ProductCartItem[]
+  lastOrder?: Order
   addToCart: (product: Product) => void
   removeFromCart: (productId: number) => void
   updateQuantity: (productId: number, quantity: number) => void
@@ -27,6 +29,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined)
 export function CartProvider({ children, defaultPaymentMethod }: { children: ReactNode, defaultPaymentMethod: Payment }) {
   const [cart, setCart] = useState<ProductCartItem[]>([{ ...productsData[0], quantity: 2 }])
   const [paymentMethod, setPaymentMethod] = useState<Payment>(defaultPaymentMethod)
+  const [lastOrder, setLastOrder] = useState<Order | undefined>(undefined)
 
   useEffect(() => {
     const savedCart = localStorage.getItem("cart")
@@ -58,11 +61,6 @@ export function CartProvider({ children, defaultPaymentMethod }: { children: Rea
   }, [])
 
   const updateQuantity = useCallback((productId: number, quantity: number) => {
-    if (quantity <= 0) {
-      removeFromCart(productId)
-      return
-    }
-
     setCart((prevCart) => prevCart.map((item) => (item.id === productId ? { ...item, quantity } : item)))
   }, [])
 
@@ -82,7 +80,8 @@ export function CartProvider({ children, defaultPaymentMethod }: { children: Rea
         getCalculatedCart: () => calculateCart(cart, paymentMethod),
         clearCart,
         paymentMethod,
-        setPaymentMethod
+        setPaymentMethod,
+        lastOrder,
       }}
     >
       {children}

@@ -99,9 +99,7 @@ export type Database = {
           employed_id: string
           id: number
           payment_id: number
-          price: number
-          product_id: number
-          quantity: number
+          sub_total: number
           tax: number
         }
         Insert: {
@@ -109,9 +107,7 @@ export type Database = {
           employed_id: string
           id?: number
           payment_id: number
-          price: number
-          product_id: number
-          quantity: number
+          sub_total: number
           tax: number
         }
         Update: {
@@ -119,9 +115,7 @@ export type Database = {
           employed_id?: string
           id?: number
           payment_id?: number
-          price?: number
-          product_id?: number
-          quantity?: number
+          sub_total?: number
           tax?: number
         }
         Relationships: [
@@ -139,8 +133,40 @@ export type Database = {
             referencedRelation: "Payment"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      Order_Product: {
+        Row: {
+          id: number
+          order_id: number
+          price: number
+          product_id: number
+          quantity: number
+        }
+        Insert: {
+          id?: number
+          order_id: number
+          price: number
+          product_id: number
+          quantity: number
+        }
+        Update: {
+          id?: number
+          order_id?: number
+          price?: number
+          product_id?: number
+          quantity?: number
+        }
+        Relationships: [
           {
-            foreignKeyName: "Order_product_id_fkey"
+            foreignKeyName: "Order_Product_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "Order"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "Order_Products_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "Product"

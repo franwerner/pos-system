@@ -1,9 +1,34 @@
-import { Separator } from "@radix-ui/react-separator";
+import { Order } from "@/features/order/types/order.type";
+import { calculateTax } from "@/features/payment/services/calculateTax.service";
+import formatCurrency from "@/shared/utils/formatCurrency.util";
 import { Check } from "lucide-react";
-import { useCart } from "../../cart/context/cart-context";
+import { OrderProduct } from "../types/order-products.type";
 
-export default function Ticket({ receipt_number }: { receipt_number: string }) {
-    const { cart } = useCart()
+const TicketProduct = ({
+    name,
+    quantity,
+    price,
+    tax
+}: OrderProduct & { tax: number }) => {
+    return (
+        <div className="flex justify-between">
+            <p className="text-gray-700">
+                {name} × {quantity}
+            </p>
+            <p className="text-gray-700">
+                {formatCurrency(calculateTax(price * quantity, tax).total)}
+            </p>
+        </div>
+    )
+}
+
+export default function Ticket({
+    created_at,
+    id,
+    products,
+    sub_total,
+    tax,
+}: Order) {
     return (
         <div className="">
             <div className="mb-6 flex items-center justify-center">
@@ -19,28 +44,23 @@ export default function Ticket({ receipt_number }: { receipt_number: string }) {
             </p>
             <div className="mb-6 text-center">
                 <p className="font-medium">
-                    Recibo #{receipt_number}
+                    Recibo #{id}
                 </p>
                 <p className="text-sm text-gray-400">
-                    {new Date().toLocaleString()}
+                    {new Date(created_at).toLocaleString()}
                 </p>
             </div>
             <hr className="my-2" />
             <div className="space-y-3">
-                {cart.map((item) => (
-                    <div key={item.id} className="flex justify-between">
-                        <div>
-                            <p className="text-gray-700">
-                                {item.name} × {item.quantity}
-                            </p>
-                        </div>
-                        <p className="text-gray-700">
-                            ${(item.price * item.quantity).toFixed(2)}
-                        </p>
-                    </div>
+                {products.map((item) => (
+                    <TicketProduct key={item.id} {...item} tax={tax} />
                 ))}
             </div>
             <hr className="my-2" />
+            <div className="flex justify-between items-center">
+                <span className="text-lg font-medium text-gray-700">Total</span>
+                <span className="text-lg font-semibold ">{formatCurrency(calculateTax(sub_total, tax).total)}</span>
+            </div>
         </div>
     )
 }

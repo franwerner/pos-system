@@ -1,29 +1,27 @@
 "use client"
-import { useCart } from "@/features/cart/context/cart-context";
-import OrderAmount from "@/features/order/components/order-amount.component";
 import Ticket from "@/features/order/components/ticket.component";
+import useGetOrder from "@/features/order/hooks/useGetOrder.hook";
 import Linker from "@/shared/components/linker.component";
+import { Loader } from "@/shared/components/loader.component";
 import { Button } from "@/shared/components/ui/button";
-import formatCurrency from "@/shared/utils/formatCurrency.util";
 import { Printer } from "lucide-react";
+import { notFound } from "next/navigation";
 
-export default function PaymentSuccess() {
+export default function OrderTicketView({ orderId }: { orderId: number }) {
 
     const handlePrint = () => {
         window.print()
     }
 
-    const { getCalculatedCart } = useCart()
-    const { total } = getCalculatedCart()
+    const { data: order, isLoading } = useGetOrder(orderId)
+
+    if (isLoading) return <Loader className="h-screen" />
+    if (!order) return notFound()
 
     return (
         <main className="flex items-center w-full justify-center min-h-screen bg-gray-50 p-4">
             <div className="w-full max-w-md rounded-lg border flex flex-col gap-6 bg-white shadow-lg p-6">
-                <Ticket receipt_number="123" />
-                <div className="flex justify-between items-center">
-                    <span className="text-lg font-medium text-gray-700">Total</span>
-                    <span className="text-lg font-semibold ">{formatCurrency(total)}</span>
-                </div>
+                <Ticket {...order} />
                 <div className="flex flex-col gap-5 print:hidden">
                     <Button
                         onClick={handlePrint}

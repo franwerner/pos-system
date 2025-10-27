@@ -6,7 +6,8 @@
     "build": "next build",
     "dev": "next dev --turbo",
     "lint": "eslint .",
-    "start": "next start"
+    "start": "next start",
+    "generated-types": "npx supabase gen types typescript --project-id jqticsulpmntkbnwnbqf --schema public > src/shared/types/database.types.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
