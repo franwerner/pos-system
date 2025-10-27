@@ -26,16 +26,16 @@ const SubCategoryItem = memo(({ item, isSelected, setCategoryFilter }: SubCatego
       key={item.id}
       onClick={() => setCategoryFilter({ id: item.parent_id!, subCategory: isSelected ? undefined : item.id })}
       className={cn(
-        "relative flex items-center gap-2 rounded-md transition-all duration-100 p-2 cursor-pointer text-sm",
+        "relative flex items-center gap-2 rounded-md transition-all duration-100 p-1 px-2 cursor-pointer text-sm",
         "",
-        isSelected && "bg-indigo-50 text-semibold text-indigo-700",
+        isSelected && "bg-primary text-semibold text-primary-foreground",
         !isSelected && "hover:bg-accent/70 hover:text-accent-foreground"
       )}
     >
       <span
         className={cn(
           "h-2 w-2 rounded-full transition-all text-me duration-300",
-          isSelected ? "bg-indigo-400 scale-100" : "bg-indigo-900 scale-75"
+          isSelected ? "bg-primary-foreground scale-100" : "bg-primary scale-75"
         )}
       />
       <span className={cn(
@@ -62,7 +62,7 @@ const CategoryGroup = memo(({ item, categoryFilter, setCategoryFilter }: Categor
           className="p-2 cursor-pointer " >
           <span className={cn(
             "font-medium",
-            isSelected && "font-semibold text-indigo-700"
+            isSelected && "font-bold"
           )}>{item.name}</span>
         </AccordionTrigger>
         <AccordionContent className="overflow-hidden pl-2">
