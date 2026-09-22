@@ -2,17 +2,17 @@ import { useQuery } from "@tanstack/react-query"
 import { readApiError } from "@/features/auth/services/readApiError.service"
 import { type Payment } from "../types/payment.type"
 
-const fetchPayments = async (): Promise<Payment[]> => {
-    const response = await fetch("/api/payment-methods?active=true")
+const fetchPaymentMethods = async (): Promise<Payment[]> => {
+    const response = await fetch("/api/payment-methods")
 
     if (!response.ok) throw new Error(await readApiError(response))
 
     return response.json()
 }
 
-export const useGetPayments = () => {
+export default function useGetPaymentMethods() {
     return useQuery({
-        queryKey: ["payments"],
-        queryFn: fetchPayments,
+        queryKey: ["payment-methods"],
+        queryFn: fetchPaymentMethods,
     })
 }

@@ -1,11 +1,10 @@
 "use client"
 
-import productsData from "@/features/products/data/products.data"
 import { Product } from "@/features/products/types/product.type"
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react"
 import { Payment } from "../../payment/types/payment.type"
 import { calculateCart } from "../services/calculateCart.service"
-import { Order } from "@/features/order/types/order.type"
+import { CART_STORAGE_KEY, readStoredCart } from "../services/readStoredCart.service"
 
 
 export interface ProductCartItem extends Product {
@@ -14,7 +13,6 @@ export interface ProductCartItem extends Product {
 
 interface CartContextType {
   cart: ProductCartItem[]
-  lastOrder?: Order
   addToCart: (product: Product) => void
   removeFromCart: (productId: number) => void
   updateQuantity: (productId: number, quantity: number) => void
@@ -27,24 +25,24 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined)
 
 export function CartProvider({ children, defaultPaymentMethod }: { children: ReactNode, defaultPaymentMethod: Payment }) {
-  const [cart, setCart] = useState<ProductCartItem[]>([{ ...productsData[0], quantity: 2 }])
+  const [cart, setCart] = useState<ProductCartItem[]>([])
+  const [isCartHydrated, setIsCartHydrated] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<Payment>(defaultPaymentMethod)
-  const [lastOrder, setLastOrder] = useState<Order | undefined>(undefined)
 
+  // localStorage no existe durante el render del servidor, así que el carrito
+  // guardado solo puede entrar después del montaje.
   useEffect(() => {
-    const savedCart = localStorage.getItem("cart")
-    if (savedCart) {
-      try {
-        setCart(JSON.parse(savedCart))
-      } catch (error) {
-        console.error("Failed to parse cart from localStorage:", error)
-      }
-    }
+    setCart(readStoredCart(localStorage.getItem(CART_STORAGE_KEY)))
+    setIsCartHydrated(true)
   }, [])
 
   useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(cart))
-  }, [cart])
+    // Sin esta guarda el primer commit escribiría el estado inicial vacío y
+    // pisaría el carrito guardado antes de que el efecto de lectura lo aplique.
+    if (!isCartHydrated) return
+
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart))
+  }, [cart, isCartHydrated])
 
   const addToCart = useCallback((product: Product) => {
     setCart((prevCart) => {
@@ -81,7 +79,6 @@ export function CartProvider({ children, defaultPaymentMethod }: { children: Rea
         clearCart,
         paymentMethod,
         setPaymentMethod,
-        lastOrder,
       }}
     >
       {children}

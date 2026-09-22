@@ -84,7 +84,7 @@ const ProductItemCart = memo(({ item, updateQuantity, removeFromCart }: Props) =
                     <p className="font-semibold text-sm text-gray-900">{formatCurrency(totalPrice)}</p>
                 </div>
                 <p className="my-1 text-sm text-gray-500">
-                    {formatCurrency(eachPrice)} / {item.unit_type}
+                    {formatCurrency(eachPrice)}
                 </p>
                 <ProductCartFooter
                     quantity={item.quantity}

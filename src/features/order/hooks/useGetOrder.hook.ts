@@ -1,9 +1,19 @@
 import { useQuery } from "@tanstack/react-query"
-import orderData from "../data/order.data"
+import { readApiError } from "@/features/auth/services/readApiError.service"
+import { type Sale } from "../types/sale.type"
 
-export default function useGetOrder(orderId: number) {
+const fetchOrder = async (orderId: number): Promise<Sale | null> => {
+    const response = await fetch(`/api/orders/${orderId}`)
+
+    if (response.status === 404) return null
+    if (!response.ok) throw new Error(await readApiError(response))
+
+    return response.json()
+}
+
+export default function useGetOrder(saleId: number) {
     return useQuery({
-        queryKey: ["order", orderId],
-        queryFn: () => orderData
+        queryKey: ["sale", saleId],
+        queryFn: () => fetchOrder(saleId),
     })
 }
