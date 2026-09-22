@@ -1,6 +1,6 @@
-import { Database } from "@/shared/types/database.types"
-import { Category } from "./category.type"
+import { type Tables } from "@/shared/types/database.types"
+import { type Category } from "./category.type"
 
-export type Product = Omit<Database["public"]["Tables"]["Product"]["Row"], "category_id"> & {
-    category: Category
+export type Product = Omit<Tables<"product">, "category_id"> & {
+    category: Category | null
 }
