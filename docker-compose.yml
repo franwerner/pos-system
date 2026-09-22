@@ -1,0 +1,19 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.local
+    environment:
+      # Turbopack no detecta cambios sobre un bind mount: sin polling el
+      # contenedor nunca recompila lo que se edita en el host.
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING_INTERVAL: "300"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
