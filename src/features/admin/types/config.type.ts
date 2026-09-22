@@ -1,6 +1,6 @@
-import { Payment } from "@/features/payment/types/payment.type";
-import { Database } from "@/shared/types/database.types";
+import { type Payment } from "@/features/payment/types/payment.type";
+import { type Tables } from "@/shared/types/database.types";
 
-export type ConfigPos = Omit<Database["public"]["Tables"]["Config"]["Row"], "default_payment_id"> & {
+export type ConfigPos = Omit<Tables<"app_config">, "default_payment_id"> & {
     default_payment: Payment
 }
