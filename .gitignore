@@ -5,6 +5,7 @@
 
 # next.js
 /.next/
+/.next-flow/
 /out/
 
 # production
@@ -25,3 +26,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# verification artifacts
+proofshot-artifacts/
