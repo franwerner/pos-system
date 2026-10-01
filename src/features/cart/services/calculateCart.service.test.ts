@@ -23,6 +23,7 @@ const buildPayment = (tax: number): Payment => ({
     name: `Método ${tax}%`,
     tax,
     is_active: true,
+    expected_share: 0,
 })
 
 describe("calculateCart", () => {

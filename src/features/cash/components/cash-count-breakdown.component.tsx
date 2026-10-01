@@ -1,3 +1,4 @@
+import { Info, TriangleAlert } from "lucide-react"
 import { cn } from "@/shared/utils/cn.util"
 import formatCurrency from "@/shared/utils/formatCurrency.util"
 import { type CashCount } from "../services/calculateCashCount.service"
@@ -7,44 +8,63 @@ interface CashCountBreakdownProps {
     className?: string
 }
 
+function Kv({ label, value, muted, hint }: { label: string; value: string; muted?: boolean; hint?: boolean }) {
+    return (
+        <div className={cn("flex items-baseline justify-between gap-4 py-2 text-[15px]", muted && "text-muted-foreground")}>
+            <span>
+                {label}
+                {hint && <span className="text-xs font-medium"> (no entra al arqueo)</span>}
+            </span>
+            <span className="font-bold tabular-nums">{value}</span>
+        </div>
+    )
+}
+
+/** Desglose de arqueo: al cerrar la caja y en el detalle de una sesión cerrada. */
 export default function CashCountBreakdown({ count, className }: CashCountBreakdownProps) {
     return (
-        <div className={cn("flex flex-col gap-2 rounded-lg border bg-muted/40 p-3 text-sm", className)}>
-            <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Monto inicial</span>
-                <span>{formatCurrency(count.openingAmount)}</span>
-            </div>
+        <div className={cn("flex flex-col rounded-[14px] border border-border px-4 py-2", className)}>
+            <Kv label="Monto inicial" value={formatCurrency(count.openingAmount)} />
 
-            {count.totalsByPaymentMethod.map((method) => (
-                <div key={method.payment_method_id} className="flex items-center justify-between">
-                    <span className="text-muted-foreground">
-                        {method.name}
-                        {!method.is_cash && " (no entra al arqueo)"}
-                    </span>
-                    <span className={cn(!method.is_cash && "text-muted-foreground")}>
-                        {formatCurrency(method.total)}
-                    </span>
+            {count.totalsByPaymentMethod.length === 0 ? (
+                <div className="my-1 flex items-center gap-2 rounded-[10px] bg-muted px-3 py-2.5 text-sm">
+                    <Info className="size-4" aria-hidden /> Esta caja todavía no tiene ventas.
                 </div>
-            ))}
-
-            {count.totalsByPaymentMethod.length === 0 && (
-                <p className="text-muted-foreground">Esta caja todavía no tiene ventas.</p>
+            ) : (
+                count.totalsByPaymentMethod.map((method) => (
+                    <Kv
+                        key={method.payment_method_id}
+                        label={method.name}
+                        value={formatCurrency(method.total)}
+                        muted={!method.is_cash}
+                        hint={!method.is_cash}
+                    />
+                ))
             )}
 
-            <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Ingresos</span>
-                <span>+ {formatCurrency(count.depositsTotal)}</span>
-            </div>
+            <Kv label="Ingresos" value={`+ ${formatCurrency(count.depositsTotal)}`} />
+            <Kv label="Egresos" value={`− ${formatCurrency(count.withdrawalsTotal)}`} />
 
-            <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Egresos</span>
-                <span>− {formatCurrency(count.withdrawalsTotal)}</span>
-            </div>
-
-            <div className="flex items-center justify-between border-t pt-2 font-semibold">
+            <div className="mt-1 flex items-baseline justify-between gap-4 border-t border-border pt-3 pb-2 text-[17px] font-extrabold">
                 <span>Esperado en caja</span>
-                <span>{formatCurrency(count.expectedAmount)}</span>
+                <span className="tabular-nums">{formatCurrency(count.expectedAmount)}</span>
             </div>
+
+            {count.noCashMethod && (
+                <div
+                    role="status"
+                    className="mt-2.5 mb-2 flex items-start gap-2.5 rounded-lg bg-warning-muted p-3 text-warning-muted-foreground"
+                >
+                    <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+                    <div>
+                        <p className="text-sm font-bold">Ningún medio de pago cuenta como efectivo</p>
+                        <p className="text-[13px]">
+                            Ninguna venta suma al esperado en caja. Si cobrás en mano, poné &quot;Efectivo&quot; en el nombre de
+                            ese medio de pago en Tarifas.
+                        </p>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

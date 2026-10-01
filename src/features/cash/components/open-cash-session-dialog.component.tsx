@@ -1,35 +1,22 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
+import { Loader2, Wallet } from "lucide-react"
 import { useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
 import { Button } from "@/shared/components/ui/button"
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/shared/components/ui/dialog"
-import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-} from "@/shared/components/ui/form"
-import { Input } from "@/shared/components/ui/input"
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/shared/components/ui/form"
 import { Textarea } from "@/shared/components/ui/textarea"
+import { DialogShell } from "@/shared/components/dialog-shell.component"
 import usePostCashSession from "../hooks/usePostCashSession.hook"
+import { MoneyAmountInput } from "./money-amount-input.component"
 
 const openCashSessionSchema = z.object({
     opening_amount: z
-        .number({ error: "El monto inicial debe ser 0 o mayor" })
-        .refine((value) => value >= 0, "El monto inicial debe ser 0 o mayor"),
+        .number({ error: "Cargá el monto inicial. Si el cajón arranca vacío, poné 0." })
+        .refine((value) => value >= 0, "Cargá el monto inicial. Si el cajón arranca vacío, poné 0."),
     note: z.string().trim().max(500, "La nota es demasiado larga"),
 })
 
@@ -52,6 +39,7 @@ interface OpenCashSessionDialogProps {
     onOpenChange: (open: boolean) => void
 }
 
+/** El monto inicial es protagonista: es el único dato que de verdad importa para abrir la caja. */
 export default function OpenCashSessionDialog({ open, onOpenChange }: OpenCashSessionDialogProps) {
     const postCashSession = usePostCashSession()
 
@@ -76,69 +64,72 @@ export default function OpenCashSessionDialog({ open, onOpenChange }: OpenCashSe
         })
     }
 
+    const submitting = postCashSession.isPending
+
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Abrir caja</DialogTitle>
-                    <DialogDescription>
-                        El monto inicial es la plata que hay en el cajón antes de la primera venta.
-                    </DialogDescription>
-                </DialogHeader>
+        <DialogShell
+            open={open}
+            onOpenChange={onOpenChange}
+            title="Abrir caja"
+            description="El monto inicial es la plata que hay en el cajón antes de la primera venta."
+            mobileBarTitle="Abrir caja"
+            widthClass="sm:max-w-md"
+            footer={
+                <>
+                    <Button type="button" variant="outline" className="hidden h-10 sm:inline-flex" onClick={() => onOpenChange(false)} disabled={submitting}>
+                        Cancelar
+                    </Button>
+                    <Button type="submit" form="open-cash-session-form" disabled={submitting} className="h-12 w-full gap-2 sm:h-10 sm:w-auto">
+                        {submitting
+                            ? (<><Loader2 className="size-4 animate-spin" aria-hidden /> Abriendo…</>)
+                            : (<><Wallet className="size-4" aria-hidden /> Abrir caja</>)}
+                    </Button>
+                </>
+            }
+        >
+            <Form {...form}>
+                <form id="open-cash-session-form" onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+                    <FormField
+                        control={form.control}
+                        name="opening_amount"
+                        render={({ field, fieldState }) => (
+                            <FormItem>
+                                <FormLabel>Monto inicial</FormLabel>
+                                <FormControl>
+                                    <MoneyAmountInput
+                                        large
+                                        autoFocus
+                                        invalid={!!fieldState.error}
+                                        name={field.name}
+                                        ref={field.ref}
+                                        onBlur={field.onBlur}
+                                        value={displayNumber(field.value)}
+                                        onChange={(event) => field.onChange(
+                                            parseNumericInput(event.target.value, event.target.valueAsNumber),
+                                        )}
+                                    />
+                                </FormControl>
+                                {!fieldState.error && <FormDescription>Puede ser $0 si el cajón arranca vacío.</FormDescription>}
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
 
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <FormField
-                            control={form.control}
-                            name="opening_amount"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Monto inicial</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            autoFocus
-                                            name={field.name}
-                                            ref={field.ref}
-                                            onBlur={field.onBlur}
-                                            value={displayNumber(field.value)}
-                                            onChange={(event) => field.onChange(
-                                                parseNumericInput(event.target.value, event.target.valueAsNumber),
-                                            )}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        <FormField
-                            control={form.control}
-                            name="note"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Nota (opcional)</FormLabel>
-                                    <FormControl>
-                                        <Textarea rows={2} placeholder="Turno tarde" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                                Cancelar
-                            </Button>
-                            <Button type="submit" disabled={postCashSession.isPending}>
-                                Abrir caja
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </Form>
-            </DialogContent>
-        </Dialog>
+                    <FormField
+                        control={form.control}
+                        name="note"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Nota (opcional)</FormLabel>
+                                <FormControl>
+                                    <Textarea rows={2} placeholder="Ej.: fondo que dejó el turno anterior" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </form>
+            </Form>
+        </DialogShell>
     )
 }

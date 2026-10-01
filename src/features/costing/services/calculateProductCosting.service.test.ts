@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest"
 import { resolveComponentCost } from "@/features/production/services/calculateProductionCost.service"
-import { buildTaxContext } from "@/features/taxes/services/buildTaxContext.service"
-import { NO_TAXES, type TaxContext } from "@/features/taxes/types/tax.type"
 import { type CostableProduct, type CostingSupplyLine } from "../types/costing.type"
 import {
     buildProductCostings,
@@ -9,7 +7,6 @@ import {
     type CostingParams,
     type WastePercentages,
 } from "./calculateProductCosting.service"
-import { resolveSupplyUnitCost } from "./resolveSupplyUnitCost.service"
 
 const hamburguesa: CostingSupplyLine[] = [
     { supply_id: 1, name: "Carne picada", type: "food", unit: "gr", quantity: 100, unit_cost: 12 },
@@ -23,9 +20,7 @@ const onlyFoodWaste: WastePercentages = { food: 10, drink: 0, packaging: 0 }
 const params: CostingParams = {
     price: 5000,
     wastePercentages: onlyFoodWaste,
-    fixedCostPerUnit: 227,
     targetMarginPercentage: 65,
-    tax: NO_TAXES,
 }
 
 describe("calculateProductCosting", () => {
@@ -61,22 +56,6 @@ describe("calculateProductCosting", () => {
         expect(costing?.variable_cost).toBe(2270)
     })
 
-    it("suma el costo fijo por unidad al costo variable", () => {
-        const costing = calculateProductCosting(hamburguesa, params)
-
-        expect(costing?.variable_cost).toBe(2270)
-        expect(costing?.fixed_cost_amount).toBe(227)
-        expect(costing?.total_cost).toBe(2497)
-    })
-
-    it("deja el costo total igual al variable cuando todavía no hay fijos que repartir", () => {
-        const costing = calculateProductCosting(hamburguesa, { ...params, fixedCostPerUnit: 0 })
-
-        expect(costing?.fixed_cost_amount).toBe(0)
-        expect(costing?.total_cost).toBe(costing?.variable_cost)
-        expect(costing?.net_margin).toBe(costing?.contribution_margin)
-    })
-
     it("costea un producto que incluye un preparado con el costo de su última producción", () => {
         const milanesaAlPan: CostingSupplyLine[] = [
             {
@@ -109,21 +88,18 @@ describe("calculateProductCosting", () => {
         expect(costing?.variable_cost).toBe(780)
     })
 
-    it("devuelve el margen de contribución y el neto en pesos y en porcentaje", () => {
+    it("'te queda por plato' es el precio de venta menos lo que cuesta hacerlo", () => {
         const costing = calculateProductCosting(hamburguesa, params)
 
+        expect(costing?.variable_cost).toBe(2270)
         expect(costing?.contribution_margin).toBe(2730)
-        expect(costing?.contribution_margin_percentage).toBeCloseTo(54.6, 10)
-        expect(costing?.net_margin).toBe(2503)
-        expect(costing?.net_margin_percentage).toBeCloseTo(50.06, 10)
     })
 
-    it("da margen neto negativo cuando el precio no cubre el costo total", () => {
-        const costing = calculateProductCosting(hamburguesa, { ...params, price: 2400 })
+    it("da 'te queda por plato' negativo cuando el precio no cubre lo que cuesta hacerlo", () => {
+        const costing = calculateProductCosting(hamburguesa, { ...params, price: 2000 })
 
-        expect(costing?.contribution_margin).toBe(130)
-        expect(costing?.net_margin).toBe(-97)
-        expect(costing?.net_margin_percentage).toBeCloseTo(-4.0417, 4)
+        expect(costing?.variable_cost).toBe(2270)
+        expect(costing?.contribution_margin).toBe(-270)
     })
 
     it("no costea un producto sin composición", () => {
@@ -141,36 +117,43 @@ describe("calculateProductCosting", () => {
         })).toThrowError(/merma/)
         expect(() => calculateProductCosting(hamburguesa, { ...params, price: -1 }))
             .toThrowError(/precio/)
-        expect(() => calculateProductCosting(hamburguesa, { ...params, fixedCostPerUnit: -1 }))
-            .toThrowError(/costo fijo por unidad/)
-        expect(() => calculateProductCosting(hamburguesa, {
-            ...params,
-            tax: { ...NO_TAXES, sale_rate: -1 },
-        })).toThrowError(/tasas de impuestos/)
     })
 })
 
 describe("el precio sugerido", () => {
-    it("es el costo total llevado al margen objetivo", () => {
+    it("es el costo variable llevado al margen objetivo, sin impuestos", () => {
         const costing = calculateProductCosting(hamburguesa, params)
 
-        expect(costing?.suggested_price).toBeCloseTo(2497 / 0.35, 10)
-        expect(costing?.suggested_price_difference).toBeCloseTo(2497 / 0.35 - 5000, 10)
+        expect(costing?.variable_cost).toBe(2270)
+        expect(costing?.suggested_price).toBeCloseTo(2270 / 0.35, 10)
     })
 
-    it("sube lo que el precio va a perder en impuestos sobre la venta", () => {
-        const costing = calculateProductCosting(hamburguesa, {
-            ...params,
-            tax: { ...NO_TAXES, sale_rate: 21, payment_rate: 3 },
+    // Ejemplo de referencia: insumos + pérdidas de comida (10%) dan un costo variable
+    // de 3300 sobre 3000 de insumos; con un margen objetivo del 70% el precio sugerido
+    // es ese costo variable dividido 0,3 (lo que no es margen).
+    it("ejemplo de referencia: insumos 3000, merma de comida 10%, margen 70% → sugerido = variable / 0,3", () => {
+        const lines: CostingSupplyLine[] = [
+            { supply_id: 1, name: "Insumo", type: "food", unit: "gr", quantity: 1, unit_cost: 3000 },
+        ]
+
+        const costing = calculateProductCosting(lines, {
+            price: 12000,
+            wastePercentages: { food: 10, drink: 0, packaging: 0 },
+            targetMarginPercentage: 70,
         })
 
-        expect(costing?.suggested_price).toBeCloseTo((2497 / 0.35) * 1.24, 10)
+        expect(costing?.supplies_cost).toBe(3000)
+        expect(costing?.waste_cost).toBe(300)
+        expect(costing?.variable_cost).toBe(3300)
+        expect(costing?.suggested_price).toBeCloseTo(3300 / 0.3, 10)
+        expect(costing?.contribution_margin).toBe(12000 - 3300)
     })
 
-    it("marca en negativo la diferencia cuando el precio actual ya supera al sugerido", () => {
-        const costing = calculateProductCosting(hamburguesa, { ...params, price: 12000 })
+    it("un margen objetivo más alto pide un precio más alto", () => {
+        const low = calculateProductCosting(hamburguesa, { ...params, targetMarginPercentage: 40 })
+        const high = calculateProductCosting(hamburguesa, { ...params, targetMarginPercentage: 80 })
 
-        expect(costing!.suggested_price_difference).toBeLessThan(0)
+        expect(high!.suggested_price!).toBeGreaterThan(low!.suggested_price!)
     })
 
     it("no existe sin margen objetivo: el producto igual se costea", () => {
@@ -179,131 +162,9 @@ describe("el precio sugerido", () => {
             targetMarginPercentage: null,
         })
 
-        expect(costing?.total_cost).toBe(2497)
+        expect(costing?.variable_cost).toBe(2270)
+        expect(costing?.target_margin_percentage).toBeNull()
         expect(costing?.suggested_price).toBeNull()
-        expect(costing?.suggested_price_difference).toBeNull()
-    })
-})
-
-describe("el motor de impuestos", () => {
-    // La cadena completa: precio de compra del insumo → rendimiento → composición
-    // → merma → costo fijo → impuestos sobre la venta → ganancia.
-    const carne = { origin: "purchased" as const, purchase_price: 12.1, yield_factor: 1, last_production_unit_cost: null }
-    const bandeja = { origin: "purchased" as const, purchase_price: 121, yield_factor: 1, last_production_unit_cost: null }
-
-    const buildLines = (tax: TaxContext): CostingSupplyLine[] => [
-        {
-            supply_id: 1,
-            name: "Carne picada",
-            type: "food",
-            unit: "gr",
-            quantity: 100,
-            unit_cost: resolveSupplyUnitCost(carne, tax),
-        },
-        {
-            supply_id: 2,
-            name: "Bandeja",
-            type: "packaging",
-            unit: "u",
-            quantity: 1,
-            unit_cost: resolveSupplyUnitCost(bandeja, tax),
-        },
-    ]
-
-    const cost = (tax: TaxContext) =>
-        calculateProductCosting(buildLines(tax), {
-            price: 5000,
-            wastePercentages: onlyFoodWaste,
-            fixedCostPerUnit: 290.4,
-            targetMarginPercentage: 65,
-            tax,
-        })!
-
-    it("con la tabla de impuestos vacía el precio pagado es el costo y el cobrado es el ingreso", () => {
-        const costing = cost(buildTaxContext([]))
-
-        expect(costing.lines[0].unit_cost).toBe(12.1)
-        expect(costing.supplies_cost).toBeCloseTo(1331, 10)
-        expect(costing.waste_cost).toBeCloseTo(121, 10)
-        expect(costing.variable_cost).toBeCloseTo(1452, 10)
-        expect(costing.net_price).toBe(5000)
-        expect(costing.sale_tax_amount).toBe(0)
-        expect(costing.total_cost).toBeCloseTo(1742.4, 10)
-        expect(costing.contribution_margin).toBeCloseTo(3548, 10)
-        expect(costing.profit_tax_amount).toBe(0)
-        expect(costing.net_margin).toBeCloseTo(3257.6, 10)
-        expect(costing.net_margin_percentage).toBeCloseTo(65.152, 10)
-    })
-
-    it("con IVA compras recuperable e IVA ventas el crédito fiscal no es costo y el IVA no es ingreso", () => {
-        const tax = buildTaxContext([
-            { type: "purchase", rate: 21, amount: 0, is_recoverable: true, payment_method_id: null, is_active: true },
-            { type: "sale", rate: 21, amount: 0, is_recoverable: false, payment_method_id: null, is_active: true },
-        ])
-
-        const costing = cost(tax)
-
-        expect(costing.lines[0].unit_cost).toBeCloseTo(10, 10)
-        expect(costing.lines[1].unit_cost).toBeCloseTo(100, 10)
-        expect(costing.supplies_cost).toBeCloseTo(1100, 10)
-        expect(costing.variable_cost).toBeCloseTo(1200, 10)
-        expect(costing.net_price).toBeCloseTo(5000 / 1.21, 10)
-        expect(costing.total_cost).toBeCloseTo(1490.4, 10)
-        expect(costing.contribution_margin).toBeCloseTo(5000 / 1.21 - 1200, 10)
-    })
-
-    it("un impuesto de compra que no se recupera queda adentro del costo", () => {
-        const noRecoverable = buildTaxContext([
-            { type: "purchase", rate: 21, amount: 0, is_recoverable: false, payment_method_id: null, is_active: true },
-        ])
-
-        expect(cost(noRecoverable).lines[0].unit_cost).toBe(12.1)
-    })
-
-    it("los impuestos sobre la ganancia se aplican después de restar todos los costos", () => {
-        const tax = buildTaxContext([
-            { type: "profit", rate: 35, amount: 0, is_recoverable: false, payment_method_id: null, is_active: true },
-        ])
-
-        const costing = cost(tax)
-
-        expect(costing.gross_profit).toBeCloseTo(3257.6, 10)
-        expect(costing.profit_tax_amount).toBeCloseTo(3257.6 * 0.35, 10)
-        expect(costing.net_margin).toBeCloseTo(3257.6 * 0.65, 10)
-    })
-
-    it("una pérdida no paga impuesto a la ganancia", () => {
-        const tax = buildTaxContext([
-            { type: "profit", rate: 35, amount: 0, is_recoverable: false, payment_method_id: null, is_active: true },
-        ])
-
-        const costing = calculateProductCosting(buildLines(tax), {
-            price: 1000,
-            wastePercentages: onlyFoodWaste,
-            fixedCostPerUnit: 290.4,
-            targetMarginPercentage: 65,
-            tax,
-        })!
-
-        expect(costing.net_margin).toBeLessThan(0)
-        expect(costing.profit_tax_amount).toBe(0)
-        expect(costing.net_margin).toBe(costing.gross_profit)
-    })
-
-    it("la comisión del medio de pago se descuenta del precio junto con el impuesto a la venta", () => {
-        const tax = buildTaxContext(
-            [{ type: "payment", rate: 6, amount: 0, is_recoverable: false, payment_method_id: 2, is_active: true }],
-            [
-                { payment_method_id: 1, amount: 5000 },
-                { payment_method_id: 2, amount: 5000 },
-            ],
-        )
-
-        const costing = cost(tax)
-
-        expect(tax.payment_rate).toBeCloseTo(3, 10)
-        expect(costing.net_price).toBeCloseTo(5000 / 1.03, 10)
-        expect(costing.sale_tax_amount).toBeCloseTo(5000 - 5000 / 1.03, 10)
     })
 })
 
@@ -315,15 +176,13 @@ describe("buildProductCostings", () => {
 
     const defaultParams = {
         wastePercentages: onlyFoodWaste,
-        fixedCostPerUnit: 227,
-        tax: NO_TAXES,
     }
 
     it("costea cada producto con su propio precio y deja sin costear al que no tiene composición", () => {
         const [hamburguesaRow, pizzaRow] = buildProductCostings(products, defaultParams)
 
-        expect(hamburguesaRow.costing?.total_cost).toBe(2497)
-        expect(hamburguesaRow.costing?.net_margin).toBe(2503)
+        expect(hamburguesaRow.costing?.variable_cost).toBe(2270)
+        expect(hamburguesaRow.costing?.contribution_margin).toBe(2730)
         expect(pizzaRow.costing).toBeNull()
     })
 
@@ -337,9 +196,9 @@ describe("buildProductCostings", () => {
         )
 
         expect(hamburguesaRow.costing?.target_margin_percentage).toBe(65)
-        expect(hamburguesaRow.costing?.suggested_price).toBeCloseTo(2497 / 0.35, 6)
+        expect(hamburguesaRow.costing?.suggested_price).toBeCloseTo(2270 / 0.35, 6)
         expect(gaseosaRow.costing?.target_margin_percentage).toBe(80)
-        expect(gaseosaRow.costing?.suggested_price).toBeCloseTo(2497 / 0.2, 6)
+        expect(gaseosaRow.costing?.suggested_price).toBeCloseTo(2270 / 0.2, 6)
     })
 
     it("deja sin precio sugerido al producto que no tiene margen objetivo cargado", () => {
@@ -348,9 +207,8 @@ describe("buildProductCostings", () => {
             defaultParams,
         )
 
-        expect(row.costing?.total_cost).toBe(2497)
+        expect(row.costing?.variable_cost).toBe(2270)
         expect(row.costing?.target_margin_percentage).toBeNull()
         expect(row.costing?.suggested_price).toBeNull()
-        expect(row.costing?.suggested_price_difference).toBeNull()
     })
 })

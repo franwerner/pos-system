@@ -1,6 +1,7 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
+import { Loader2 } from "lucide-react"
 import { useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
@@ -24,29 +25,27 @@ import {
     FormMessage,
 } from "@/shared/components/ui/form"
 import { Input } from "@/shared/components/ui/input"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/shared/components/ui/select"
-import { Textarea } from "@/shared/components/ui/textarea"
+import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs"
 import usePostStockMovement from "../hooks/usePostStockMovement.hook"
 import {
     MANUAL_MOVEMENT_TYPE_LABELS,
     MANUAL_MOVEMENT_TYPES,
-    MOVEMENT_DIRECTION_LABELS,
     MOVEMENT_DIRECTIONS,
+    MOVEMENT_DIRECTION_LABELS,
+    type ManualMovementType,
+    type MovementDirection,
     type SupplyStock,
 } from "../types/stock.type"
+import { formatQuantity } from "./stock-table.component"
+
+const QUANTITY_ERROR = "Cargá una cantidad mayor a 0."
 
 const movementFormSchema = z.object({
     type: z.enum(MANUAL_MOVEMENT_TYPES),
     direction: z.enum(MOVEMENT_DIRECTIONS),
     quantity: z
-        .number({ error: "La cantidad debe ser mayor a 0" })
-        .refine((value) => value > 0, "La cantidad debe ser mayor a 0"),
+        .number({ error: QUANTITY_ERROR })
+        .refine((value) => value > 0, QUANTITY_ERROR),
     note: z.string().trim().max(500, "La nota es demasiado larga"),
 })
 
@@ -65,6 +64,77 @@ const parseNumericInput = (value: string, valueAsNumber: number) =>
     value === "" ? Number.NaN : valueAsNumber
 
 const displayNumber = (value: number) => (Number.isNaN(value) ? "" : value)
+
+const KIND_HELP: Record<ManualMovementType, string> = {
+    waste: "Pérdida: mercadería que ya no está porque se quemó, se venció o se cayó. Esa plata se perdió.",
+    adjustment: "Ajuste: el número estaba mal cargado y lo corregís. No se perdió nada, solo estaba mal anotado.",
+}
+
+const QUANTITY_HELP: Record<ManualMovementType, string> = {
+    waste: "Cargala en positivo: una pérdida siempre resta del stock.",
+    adjustment: "Cargala en positivo: la dirección decide si suma o resta.",
+}
+
+/** Tipo de movimiento: control segmentado Pérdida/Ajuste (reemplaza el `Select` original). */
+function MovementTypeToggle({
+    value,
+    onChange,
+}: {
+    value: ManualMovementType
+    onChange: (value: ManualMovementType) => void
+}) {
+    return (
+        <div className="flex flex-col gap-1.5">
+            <span id="movimiento-tipo" className="text-sm font-semibold">
+                Tipo de movimiento
+            </span>
+            <Tabs
+                value={value}
+                onValueChange={(next) => onChange(next as ManualMovementType)}
+                aria-labelledby="movimiento-tipo"
+            >
+                <TabsList className="grid h-auto w-full grid-cols-2 rounded-xl p-1">
+                    {MANUAL_MOVEMENT_TYPES.map((type) => (
+                        <TabsTrigger key={type} value={type} className="h-11 rounded-[9px] font-semibold sm:h-9">
+                            {MANUAL_MOVEMENT_TYPE_LABELS[type]}
+                        </TabsTrigger>
+                    ))}
+                </TabsList>
+            </Tabs>
+            <p className="text-[13px] text-muted-foreground">{KIND_HELP[value]}</p>
+        </div>
+    )
+}
+
+/** Dirección: solo para Ajuste (la Pérdida siempre resta, no es una decisión del usuario). */
+function DirectionToggle({
+    value,
+    onChange,
+}: {
+    value: MovementDirection
+    onChange: (value: MovementDirection) => void
+}) {
+    return (
+        <div className="flex flex-col gap-1.5">
+            <span id="movimiento-direccion" className="text-sm font-semibold">
+                Dirección
+            </span>
+            <Tabs
+                value={value}
+                onValueChange={(next) => onChange(next as MovementDirection)}
+                aria-labelledby="movimiento-direccion"
+            >
+                <TabsList className="grid h-auto w-full grid-cols-2 rounded-xl p-1">
+                    {MOVEMENT_DIRECTIONS.map((direction) => (
+                        <TabsTrigger key={direction} value={direction} className="h-11 rounded-[9px] font-semibold sm:h-9">
+                            {MOVEMENT_DIRECTION_LABELS[direction]}
+                        </TabsTrigger>
+                    ))}
+                </TabsList>
+            </Tabs>
+        </div>
+    )
+}
 
 interface StockMovementFormDialogProps {
     open: boolean
@@ -114,39 +184,19 @@ export default function StockMovementFormDialog({
                     <DialogTitle>Pérdida o ajuste</DialogTitle>
                     <DialogDescription>
                         {supplyStock
-                            ? `"${supplyStock.name}" tiene hoy ${supplyStock.current_stock} ${supplyStock.unit}.`
+                            ? `“${supplyStock.name}” tiene hoy ${formatQuantity(supplyStock.current_stock)} ${supplyStock.unit}.`
                             : ""}
                     </DialogDescription>
                 </DialogHeader>
 
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-[18px]">
                         <FormField
                             control={form.control}
                             name="type"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Tipo de movimiento</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {MANUAL_MOVEMENT_TYPES.map((movementType) => (
-                                                <SelectItem key={movementType} value={movementType}>
-                                                    {MANUAL_MOVEMENT_TYPE_LABELS[movementType]}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormDescription>
-                                        {type === "waste"
-                                            ? "Pérdida: mercadería que ya no está porque se quemó, se venció o se cayó. Esa plata se perdió."
-                                            : "Ajuste: el número estaba mal cargado y lo corregís. No se perdió nada, solo estaba mal anotado."}
-                                    </FormDescription>
-                                    <FormMessage />
+                                    <MovementTypeToggle value={field.value} onChange={field.onChange} />
                                 </FormItem>
                             )}
                         />
@@ -157,22 +207,7 @@ export default function StockMovementFormDialog({
                                 name="direction"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Dirección</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger className="w-full">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {MOVEMENT_DIRECTIONS.map((direction) => (
-                                                    <SelectItem key={direction} value={direction}>
-                                                        {MOVEMENT_DIRECTION_LABELS[direction]}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
+                                        <DirectionToggle value={field.value} onChange={field.onChange} />
                                     </FormItem>
                                 )}
                             />
@@ -183,12 +218,16 @@ export default function StockMovementFormDialog({
                             name="quantity"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Cantidad {supplyStock ? `(${supplyStock.unit})` : ""}</FormLabel>
+                                    <FormLabel>
+                                        Cantidad {supplyStock ? `(${supplyStock.unit})` : ""}
+                                    </FormLabel>
                                     <FormControl>
                                         <Input
                                             type="number"
                                             min="0"
                                             step="0.001"
+                                            autoFocus
+                                            placeholder="0"
                                             name={field.name}
                                             ref={field.ref}
                                             onBlur={field.onBlur}
@@ -196,13 +235,10 @@ export default function StockMovementFormDialog({
                                             onChange={(event) => field.onChange(
                                                 parseNumericInput(event.target.value, event.target.valueAsNumber),
                                             )}
+                                            className="h-11 tabular-nums sm:h-10"
                                         />
                                     </FormControl>
-                                    <FormDescription>
-                                        {type === "waste"
-                                            ? "Cargala en positivo: una pérdida siempre resta del stock."
-                                            : "Cargala en positivo: la dirección decide si suma o resta."}
-                                    </FormDescription>
+                                    <FormDescription>{QUANTITY_HELP[type]}</FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -215,7 +251,7 @@ export default function StockMovementFormDialog({
                                 <FormItem>
                                     <FormLabel>Nota (opcional)</FormLabel>
                                     <FormControl>
-                                        <Textarea rows={3} placeholder="Se venció una bandeja" {...field} />
+                                        <Input placeholder="Ej.: Se venció una bandeja" className="h-11 sm:h-10" {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -223,11 +259,17 @@ export default function StockMovementFormDialog({
                         />
 
                         <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => onOpenChange(false)}
+                                disabled={postStockMovement.isPending}
+                            >
                                 Cancelar
                             </Button>
-                            <Button type="submit" disabled={postStockMovement.isPending}>
-                                Registrar movimiento
+                            <Button type="submit" disabled={postStockMovement.isPending} className="gap-2">
+                                {postStockMovement.isPending && <Loader2 className="size-4 animate-spin" aria-hidden />}
+                                {postStockMovement.isPending ? "Guardando…" : "Registrar"}
                             </Button>
                         </DialogFooter>
                     </form>

@@ -232,18 +232,21 @@ export type Database = {
       }
       payment_method: {
         Row: {
+          expected_share: number
           id: number
           is_active: boolean
           name: string
           tax: number
         }
         Insert: {
+          expected_share?: number
           id?: never
           is_active?: boolean
           name: string
           tax?: number
         }
         Update: {
+          expected_share?: number
           id?: never
           is_active?: boolean
           name?: string

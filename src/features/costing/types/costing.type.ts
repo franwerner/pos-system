@@ -1,7 +1,5 @@
 import { type SupplyType, type SupplyUnit } from "@/features/supplies/types/supply.type"
-import { type Tax, type TaxContext } from "@/features/taxes/types/tax.type"
-import { type MeasuredFixedCost } from "../services/calculateMeasuredFixedCost.service"
-import { type AppliedWaste } from "../services/calculateWastePercentage.service"
+import { type MeasuredWasteByType } from "../services/calculateWasteByType.service"
 import {
     type ProductCostingRow,
     type WastePercentages,
@@ -25,18 +23,26 @@ export type CostableProduct = {
     lines: CostingSupplyLine[]
 }
 
-/** Todo lo que hace falta para costear un producto, sin los productos. */
+/**
+ * Todo lo que hace falta para costear un producto, sin los productos. Impuestos,
+ * comisiones y costo fijo por unidad quedan fuera (ver PLAN/01-modelo-de-costo.md):
+ * el margen objetivo de cada producto tiene que cubrirlos.
+ */
 export type CostingContext = {
-    tax: TaxContext
-    active_taxes: Tax[]
     waste_percentages: WastePercentages
-    fixed_cost_per_unit: MeasuredFixedCost
 }
 
 export type CostingReport = CostingContext & {
     month: string
-    sold_units: number
-    fixed_cost_total: number
-    measured_waste: AppliedWaste
+    measured_waste: MeasuredWasteByType
     rows: ProductCostingRow[]
+}
+
+/**
+ * El lado medido de los parámetros estimados: lo que los datos del período dicen, al
+ * lado de lo declarado. No entra al cálculo hasta que el usuario lo adopta.
+ */
+export type MeasuredParameters = {
+    month: string
+    waste: MeasuredWasteByType
 }

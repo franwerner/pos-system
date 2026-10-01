@@ -42,6 +42,8 @@ export type CashCount = {
     totalsByPaymentMethod: CashCountPaymentMethodTotal[]
     countedAmount: number | null
     difference: number | null
+    /** true = ningún método de pago califica como efectivo: nada suma al esperado en caja. */
+    noCashMethod: boolean
 }
 
 const round = (value: number): number => Math.round(value * 100) / 100
@@ -124,5 +126,6 @@ export const calculateCashCount = ({
         totalsByPaymentMethod,
         countedAmount: countedAmount == null ? null : round(countedAmount),
         difference: countedAmount == null ? null : round(countedAmount - expectedAmount),
+        noCashMethod: cashIds.size === 0,
     }
 }

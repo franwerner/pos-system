@@ -1,8 +1,7 @@
 "use client"
 
-import { Search } from "lucide-react"
 import { useEffect, useState } from "react"
-import { Input } from "@/shared/components/ui/input"
+import { FilterBar } from "@/shared/components/filter-bar.component"
 import { Label } from "@/shared/components/ui/label"
 import {
     Select,
@@ -19,6 +18,9 @@ interface SupplyFiltersProps {
     onFilterChange: (filter: Partial<SupplyFilter>) => void
 }
 
+// El diseño separa el buscador (izquierda, ancho fijo en escritorio) del tipo + "Solo
+// activos" (a la derecha): por eso no se usa el switch embebido de `FilterBar`, ese va
+// junto al buscador en otras vistas pero acá viaja con el selector de tipo.
 export default function SupplyFilters({ filter, onFilterChange }: SupplyFiltersProps) {
     const [search, setSearch] = useState(filter.search)
 
@@ -28,40 +30,39 @@ export default function SupplyFilters({ filter, onFilterChange }: SupplyFiltersP
     }, [search])
 
     return (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative w-full sm:max-w-xs">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                    placeholder="Buscar insumos..."
-                    className="pl-8"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <div className="w-full md:w-[320px]">
+                <FilterBar
+                    id="insumos"
+                    searchPlaceholder="Buscar insumos..."
+                    searchValue={search}
+                    onSearchChange={setSearch}
                 />
             </div>
-
-            <Select
-                value={filter.type}
-                onValueChange={(type) => onFilterChange({ type: type as SupplyFilter["type"] })}>
-                <SelectTrigger className="w-full sm:w-48">
-                    <SelectValue placeholder="Tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">Todos los tipos</SelectItem>
-                    {SUPPLY_TYPES.map((type) => (
-                        <SelectItem key={type} value={type}>
-                            {SUPPLY_TYPE_LABELS[type]}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-
-            <div className="flex items-center gap-2 sm:ml-auto">
-                <Switch
-                    id="only-active"
-                    checked={filter.onlyActive}
-                    onCheckedChange={(onlyActive) => onFilterChange({ onlyActive })}
-                />
-                <Label htmlFor="only-active" className="cursor-pointer">Solo activos</Label>
+            <div className="flex items-center justify-between gap-3 md:justify-start md:gap-5">
+                <Select
+                    value={filter.type}
+                    onValueChange={(type) => onFilterChange({ type: type as SupplyFilter["type"] })}>
+                    <SelectTrigger aria-label="Tipo de insumo" className="h-11 w-[190px] md:h-10 md:w-[200px]">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Todos los tipos</SelectItem>
+                        {SUPPLY_TYPES.map((type) => (
+                            <SelectItem key={type} value={type}>
+                                {SUPPLY_TYPE_LABELS[type]}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <div className="flex items-center gap-2.5">
+                    <Switch
+                        id="insumos-activos"
+                        checked={filter.onlyActive}
+                        onCheckedChange={(onlyActive) => onFilterChange({ onlyActive })}
+                    />
+                    <Label htmlFor="insumos-activos" className="text-sm font-semibold">Solo activos</Label>
+                </div>
             </div>
         </div>
     )

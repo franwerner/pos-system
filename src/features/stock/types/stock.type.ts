@@ -36,6 +36,9 @@ export type StockFilter = {
     onlyBelowMinimum: boolean
 }
 
+// "negative" tiene prioridad visual sobre "low": nunca se muestran los dos badges juntos.
+export type StockStatus = "ok" | "low" | "negative"
+
 export type ManualMovementInput = {
     supply_id: number
     type: ManualMovementType

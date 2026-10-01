@@ -1,6 +1,6 @@
 "use client"
 
-import { Plus, Trash2 } from "lucide-react"
+import { Layers, Plus, Trash2 } from "lucide-react"
 import { useFieldArray, useFormContext } from "react-hook-form"
 import { z } from "zod"
 import { Button } from "@/shared/components/ui/button"
@@ -69,93 +69,96 @@ export default function CompositionLinesField({
     const unitOf = (supplyId: number) => supplies.find((supply) => supply.id === supplyId)?.unit
 
     return (
-        <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2.5">
+            <div className="flex items-center justify-between gap-3">
                 <FormLabel>Composición</FormLabel>
-                <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => append({ ...emptyLine })}>
-                    <Plus className="h-4 w-4" />
-                    Agregar insumo
-                </Button>
             </div>
 
-            {fields.length === 0 && (
-                <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-                    {emptyMessage}
-                </p>
+            {fields.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 rounded-xl border-[1.5px] border-dashed border-border p-5 text-center text-muted-foreground">
+                    <Layers className="size-6" aria-hidden />
+                    <p className="text-sm">{emptyMessage}</p>
+                </div>
+            ) : (
+                <div className="flex flex-col gap-2.5">
+                    {fields.map((line, index) => (
+                        <div key={line.id} className="flex items-end gap-2.5">
+                            <FormField
+                                control={form.control}
+                                name={`lines.${index}.supply_id`}
+                                render={({ field }) => (
+                                    <FormItem className="min-w-0 flex-1">
+                                        <FormLabel className="text-xs">Insumo</FormLabel>
+                                        <Select
+                                            onValueChange={(value) => field.onChange(Number(value))}
+                                            value={Number.isNaN(field.value) ? "" : String(field.value)}>
+                                            <FormControl>
+                                                <SelectTrigger aria-label={`Insumo de la línea ${index + 1}`} className="h-11 w-full">
+                                                    <SelectValue placeholder="Elegí un insumo" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {availableSupplies(index).map((supply) => (
+                                                    <SelectItem key={supply.id} value={String(supply.id)}>
+                                                        {supply.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name={`lines.${index}.quantity`}
+                                render={({ field }) => (
+                                    <FormItem className="w-[110px] shrink-0 sm:w-[150px]">
+                                        <FormLabel className="text-xs">
+                                            Cantidad {unitOf(lines[index]?.supply_id) && `(${unitOf(lines[index].supply_id)})`}
+                                        </FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="number"
+                                                min="0"
+                                                step="0.001"
+                                                name={field.name}
+                                                ref={field.ref}
+                                                onBlur={field.onBlur}
+                                                value={displayNumber(field.value)}
+                                                onChange={(event) => field.onChange(
+                                                    parseNumericInput(event.target.value, event.target.valueAsNumber),
+                                                )}
+                                                className="h-11"
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="size-11 shrink-0"
+                                aria-label={`Quitar línea ${index + 1}`}
+                                onClick={() => remove(index)}>
+                                <Trash2 className="size-4" aria-hidden />
+                            </Button>
+                        </div>
+                    ))}
+                </div>
             )}
 
-            {fields.map((line, index) => (
-                <div
-                    key={line.id}
-                    className="grid grid-cols-1 items-start gap-3 rounded-lg border p-3 sm:grid-cols-[2fr_1fr_auto]">
-                    <FormField
-                        control={form.control}
-                        name={`lines.${index}.supply_id`}
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="text-xs">Insumo</FormLabel>
-                                <Select
-                                    onValueChange={(value) => field.onChange(Number(value))}
-                                    value={Number.isNaN(field.value) ? "" : String(field.value)}>
-                                    <FormControl>
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="Elegí un insumo" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        {availableSupplies(index).map((supply) => (
-                                            <SelectItem key={supply.id} value={String(supply.id)}>
-                                                {supply.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-
-                    <FormField
-                        control={form.control}
-                        name={`lines.${index}.quantity`}
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="text-xs">
-                                    Cantidad {unitOf(lines[index]?.supply_id) && `(${unitOf(lines[index].supply_id)})`}
-                                </FormLabel>
-                                <FormControl>
-                                    <Input
-                                        type="number"
-                                        min="0"
-                                        step="0.001"
-                                        name={field.name}
-                                        ref={field.ref}
-                                        onBlur={field.onBlur}
-                                        value={displayNumber(field.value)}
-                                        onChange={(event) => field.onChange(
-                                            parseNumericInput(event.target.value, event.target.valueAsNumber),
-                                        )}
-                                    />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-
-                    <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="sm:mt-6"
-                        onClick={() => remove(index)}>
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
-                </div>
-            ))}
+            <Button
+                type="button"
+                variant="secondary"
+                className="h-11 gap-2 self-start"
+                onClick={() => append({ ...emptyLine })}>
+                <Plus className="size-4" aria-hidden /> Agregar insumo
+            </Button>
         </div>
     )
 }

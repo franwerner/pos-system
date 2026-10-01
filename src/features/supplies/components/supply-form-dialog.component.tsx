@@ -1,6 +1,7 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
+import { Loader2 } from "lucide-react"
 import { useEffect, useRef } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
@@ -31,6 +32,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/shared/components/ui/select"
+import { Separator } from "@/shared/components/ui/separator"
+import { Tabs, TabsList, TabsTrigger } from "@/shared/components/ui/tabs"
 import useGetSupplies from "../hooks/useGetSupplies.hook"
 import useGetSupplyComposition from "../hooks/useGetSupplyComposition.hook"
 import usePatchSupply from "../hooks/usePatchSupply.hook"
@@ -44,6 +47,7 @@ import {
     SUPPLY_UNIT_LABELS,
     SUPPLY_UNITS,
     type Supply,
+    type SupplyOrigin,
 } from "../types/supply.type"
 import CompositionLinesField, { compositionLinesSchema } from "./composition-lines-field.component"
 
@@ -92,6 +96,24 @@ const parseNumericInput = (value: string, valueAsNumber: number) =>
 
 const displayNumber = (value: number) => (Number.isNaN(value) ? "" : value)
 
+/** Origen: control segmentado Comprado / Preparado (reemplaza el `Select` original). */
+function OriginToggle({ value, onChange }: { value: SupplyOrigin; onChange: (value: SupplyOrigin) => void }) {
+    return (
+        <div className="flex min-w-0 flex-col gap-1.5">
+            <span id="insumo-origen" className="text-sm font-semibold">Origen</span>
+            <Tabs value={value} onValueChange={(next) => onChange(next as SupplyOrigin)} aria-labelledby="insumo-origen">
+                <TabsList className="grid h-auto w-full grid-cols-2 rounded-xl p-1">
+                    {SUPPLY_ORIGINS.map((origin) => (
+                        <TabsTrigger key={origin} value={origin} className="h-11 rounded-[9px] font-semibold sm:h-9">
+                            {SUPPLY_ORIGIN_LABELS[origin]}
+                        </TabsTrigger>
+                    ))}
+                </TabsList>
+            </Tabs>
+        </div>
+    )
+}
+
 interface SupplyFormDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
@@ -136,8 +158,12 @@ export default function SupplyFormDialog({ open, onOpenChange, supply }: SupplyF
     }, [open, supply, composition])
 
     const origin = form.watch("origin")
+    const watchedName = form.watch("name")
+    const prepared = origin === "produced"
 
     useEffect(() => {
+        // Un preparado no se compra: al pasar a "Preparado" se vacía la composición
+        // heredada (mismo comportamiento que antes del reskin).
         if (origin !== "produced") form.setValue("lines", [])
     }, [origin])
 
@@ -171,27 +197,39 @@ export default function SupplyFormDialog({ open, onOpenChange, supply }: SupplyF
                 <DialogHeader>
                     <DialogTitle>{supply ? "Editar insumo" : "Nuevo insumo"}</DialogTitle>
                     <DialogDescription>
-                        Los insumos son todo lo que tiene stock: ingredientes, packaging y bebidas.
+                        {supply
+                            ? `${watchedName || supply.name} · los cambios se usan en el próximo costeo.`
+                            : "Cargá cómo se compra y cuánto rinde. Después lo vas a poder usar en recetas."}
                     </DialogDescription>
                 </DialogHeader>
 
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <FormField
-                            control={form.control}
-                            name="name"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Nombre</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="Carne picada" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-[18px]">
+                        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                            <FormField
+                                control={form.control}
+                                name="name"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Nombre</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Ej.: Carne picada" className="h-11" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
 
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                            <FormField
+                                control={form.control}
+                                name="origin"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <OriginToggle value={field.value} onChange={field.onChange} />
+                                    </FormItem>
+                                )}
+                            />
+
                             <FormField
                                 control={form.control}
                                 name="type"
@@ -200,7 +238,7 @@ export default function SupplyFormDialog({ open, onOpenChange, supply }: SupplyF
                                         <FormLabel>Tipo</FormLabel>
                                         <Select onValueChange={field.onChange} value={field.value}>
                                             <FormControl>
-                                                <SelectTrigger className="w-full">
+                                                <SelectTrigger className="h-11 w-full">
                                                     <SelectValue />
                                                 </SelectTrigger>
                                             </FormControl>
@@ -225,7 +263,7 @@ export default function SupplyFormDialog({ open, onOpenChange, supply }: SupplyF
                                         <FormLabel>Unidad</FormLabel>
                                         <Select onValueChange={field.onChange} value={field.value}>
                                             <FormControl>
-                                                <SelectTrigger className="w-full">
+                                                <SelectTrigger className="h-11 w-full">
                                                     <SelectValue />
                                                 </SelectTrigger>
                                             </FormControl>
@@ -244,51 +282,35 @@ export default function SupplyFormDialog({ open, onOpenChange, supply }: SupplyF
 
                             <FormField
                                 control={form.control}
-                                name="origin"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Origen</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger className="w-full">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {SUPPLY_ORIGINS.map((origin) => (
-                                                    <SelectItem key={origin} value={origin}>
-                                                        {SUPPLY_ORIGIN_LABELS[origin]}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                            <FormField
-                                control={form.control}
                                 name="purchase_price"
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Precio de compra</FormLabel>
                                         <FormControl>
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                name={field.name}
-                                                ref={field.ref}
-                                                onBlur={field.onBlur}
-                                                value={displayNumber(field.value)}
-                                                onChange={(event) => field.onChange(
-                                                    parseNumericInput(event.target.value, event.target.valueAsNumber),
-                                                )}
-                                            />
+                                            <div className="relative">
+                                                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                                                <Input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    inputMode="decimal"
+                                                    disabled={prepared}
+                                                    name={field.name}
+                                                    ref={field.ref}
+                                                    onBlur={field.onBlur}
+                                                    value={displayNumber(field.value)}
+                                                    onChange={(event) => field.onChange(
+                                                        parseNumericInput(event.target.value, event.target.valueAsNumber),
+                                                    )}
+                                                    className="h-11 pl-7 tabular-nums"
+                                                />
+                                            </div>
                                         </FormControl>
+                                        <FormDescription>
+                                            {prepared
+                                                ? "Un preparado no se compra: su costo sale de la última producción."
+                                                : "Por unidad de medida: por gramo, por mililitro o por unidad."}
+                                        </FormDescription>
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -312,6 +334,7 @@ export default function SupplyFormDialog({ open, onOpenChange, supply }: SupplyF
                                                 onChange={(event) => field.onChange(
                                                     parseNumericInput(event.target.value, event.target.valueAsNumber),
                                                 )}
+                                                className="h-11 tabular-nums"
                                             />
                                         </FormControl>
                                         <FormDescription>1 kg de papa que rinde 750 g pelada: 0,750</FormDescription>
@@ -338,33 +361,41 @@ export default function SupplyFormDialog({ open, onOpenChange, supply }: SupplyF
                                                 onChange={(event) => field.onChange(
                                                     parseNumericInput(event.target.value, event.target.valueAsNumber),
                                                 )}
+                                                className="h-11 tabular-nums"
                                             />
                                         </FormControl>
+                                        <FormDescription>
+                                            Por debajo de este número, el insumo aparece con aviso en Stock.
+                                        </FormDescription>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
                         </div>
 
-                        {origin === "produced" && (
-                            <div className="rounded-lg border bg-muted/30 p-3">
-                                <p className="mb-3 text-sm text-muted-foreground">
-                                    Qué consume este preparado cada vez que se produce una unidad.
-                                </p>
-                                <CompositionLinesField
-                                    supplies={supplies ?? []}
-                                    excludedSupplyId={supply?.id}
-                                    emptyMessage="Sin componentes: el preparado no consume nada al producirse."
-                                />
-                            </div>
+                        {prepared && (
+                            <>
+                                <Separator />
+                                <div className="flex flex-col gap-2.5">
+                                    <p className="text-[13px] text-muted-foreground">
+                                        Qué consume este preparado cada vez que se produce una unidad.
+                                    </p>
+                                    <CompositionLinesField
+                                        supplies={supplies ?? []}
+                                        excludedSupplyId={supply?.id}
+                                        emptyMessage="Sin componentes: el preparado no consume nada al producirse."
+                                    />
+                                </div>
+                            </>
                         )}
 
                         <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
                                 Cancelar
                             </Button>
-                            <Button type="submit" disabled={isPending}>
-                                {supply ? "Guardar cambios" : "Crear insumo"}
+                            <Button type="submit" disabled={isPending} className="gap-2">
+                                {isPending && <Loader2 className="size-4 animate-spin" aria-hidden />}
+                                {isPending ? "Guardando…" : supply ? "Guardar cambios" : "Crear insumo"}
                             </Button>
                         </DialogFooter>
                     </form>

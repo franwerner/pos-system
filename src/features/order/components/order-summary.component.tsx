@@ -1,111 +1,80 @@
-import ProductImage from "@/features/products/components/product-image.component"
-import { Accordion, AccordionContent, AccordionItem } from "@/shared/components/ui/accordion"
-import formatCurrency from "@/shared/utils/formatCurrency.util"
-import { Separator } from "@radix-ui/react-separator"
-import clsx from "clsx"
+"use client"
+
 import { ChevronDown } from "lucide-react"
 import { memo, useState } from "react"
-import { ProductCartItem, useCart } from "../../cart/context/cart-context"
+import { type ProductCartItem, useCart } from "@/features/cart/context/cart-context"
+import { resolveCategoryVisual } from "@/features/products/services/resolveCategoryVisual.service"
+import { Money } from "@/shared/components/money.component"
+import { ProductPlate } from "@/shared/components/product-plate.component"
+import { Button } from "@/shared/components/ui/button"
+import { cn } from "@/shared/utils/cn.util"
 import OrderAmount from "./order-amount.component"
 
+const MAX_VISIBLE = 3
+
 export const ProductSummaryItem = memo(({ item }: { item: ProductCartItem }) => {
+    const visual = resolveCategoryVisual(item.category?.name)
+
     return (
-        <div
-            className="flex items-center justify-between gap-3 py-2 border-b border-gray-100 last:border-0"
-            key={item.id}>
-            <div className="flex items-center gap-3">
-                <ProductImage
-                    src={item.img_url}
-                    alt={item.name}
-                    width={48}
-                    height={48}
-                    className="w-12 h-12 object-cover rounded-md border"
-                />
-                <div>
-                    <p className="font-medium text-gray-800">{item.name}</p>
-                    <p className="text-sm text-gray-500">
-                        {formatCurrency(item.price)} × {item.quantity}
-                    </p>
-                </div>
+        <div className="flex items-center gap-3 border-b border-border py-3 last:border-0">
+            <ProductPlate
+                size="md"
+                imageUrl={item.img_url ?? undefined}
+                icon={visual.icon}
+                tone={visual.tone}
+                alt={item.name}
+            />
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="font-semibold">{item.name}</span>
+                <span className="text-sm text-muted-foreground tabular-nums">
+                    <Money value={item.price} size="sm" tone="muted" className="font-normal" /> × {item.quantity}
+                </span>
             </div>
-            <p className="font-semibold text-gray-900">
-                {formatCurrency(item.price * item.quantity)}
-            </p>
+            <Money value={item.price * item.quantity} className="text-lg" />
         </div>
     )
 })
+ProductSummaryItem.displayName = "ProductSummaryItem"
 
+// Con más de 3 productos se colapsa: arranca mostrando solo los primeros 3, igual
+// que el diseño, en vez de un acordeón con animación que no aporta acá.
 const ProductsSummary = () => {
     const { cart } = useCart()
     const [open, setOpen] = useState(false)
-
-    const MAX_VIEW = 3
+    const hiddenCount = Math.max(cart.length - MAX_VISIBLE, 0)
 
     return (
-        <Accordion
-            type="single"
-            value={open ? "more" : ""}
-            collapsible>
-            {cart.slice(0, MAX_VIEW).map((item) => (
-                <div key={item.id}>
-                    <ProductSummaryItem item={item} />
-                </div>
+        <div className="flex flex-col">
+            {cart.slice(0, MAX_VISIBLE).map((item) => (
+                <ProductSummaryItem item={item} key={item.id} />
             ))}
-            {cart.length > MAX_VIEW && (
-                <AccordionItem
-                    key="more"
-                    value="more"
+            {open && cart.slice(MAX_VISIBLE).map((item) => (
+                <ProductSummaryItem item={item} key={item.id} />
+            ))}
+            {hiddenCount > 0 && (
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="lg"
+                    className="mt-1.5 h-12 w-full gap-2"
+                    onClick={() => setOpen((value) => !value)}
                 >
-                    <AccordionContent>
-                        {cart.slice(MAX_VIEW).map((item) => (
-                            <ProductSummaryItem item={item} key={item.id} />
-                        ))}
-                    </AccordionContent>
-                </AccordionItem>
+                    <ChevronDown className={cn("size-5 transition-transform duration-200", open && "rotate-180")} aria-hidden />
+                    {open ? "Ver menos" : `Ver ${hiddenCount} productos más`}
+                </Button>
             )}
-            {cart.length > MAX_VIEW && (
-                <div
-                    className="mt-2 flex items-center justify-between cursor-pointer select-none rounded-md px-3 py-1 hover:bg-gray-100 transition"
-                    onClick={() => setOpen(!open)}
-                >
-                    <span className="text-sm font-medium text-gray-700">
-                        {open
-                            ? "Ver menos"
-                            : (
-                                <>
-                                    Ver <span className="font-bold">{cart.length - MAX_VIEW}</span> productos más
-                                </>
-                            )
-                        }
-                    </span>
-                    <ChevronDown
-                        className={clsx(
-                            "h-4 w-4 text-gray-500 transition-transform duration-200",
-                            open ? "rotate-180" : ""
-                        )}
-                    />
-                </div>
-            )}
-        </Accordion>
-    );
+        </div>
+    )
 }
 
 export default function OrderSummary() {
-
     return (
-        <div className="bg-white rounded-xl border shadow-sm p-5">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800">
-                Resumen del Pedido
-            </h2>
-
-            <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-0 rounded-xl border border-border bg-card p-0">
+            <h2 className="px-5 pb-1.5 pt-[18px] text-lg font-bold">Resumen del pedido</h2>
+            <div className="px-5">
                 <ProductsSummary />
             </div>
-            <Separator className="my-4" />
-            <div className="flex flex-col gap-2 p-4">
-                <h2 className="text-lg font-semibold text-gray-800">
-                    Resumen del Pedido
-                </h2>
+            <div className="flex flex-col gap-1 px-5 pb-[18px] pt-3.5">
                 <OrderAmount />
             </div>
         </div>

@@ -2,7 +2,6 @@ import {
     Boxes,
     CreditCard,
     ChefHat,
-    Landmark,
     Package,
     Receipt,
     Settings,
@@ -59,15 +58,8 @@ export const ADMIN_SECTIONS: AdminSection[] = [
     {
         href: "/admin/fixed-costs",
         label: "Costos fijos",
-        description: "Gastos mensuales que se reparten por unidad vendida.",
+        description: "Gastos mensuales y cuánto necesitás vender para cubrirlos.",
         icon: Receipt,
-        isAvailable: true,
-    },
-    {
-        href: "/admin/taxes",
-        label: "Impuestos",
-        description: "Qué impuesto entra en cada paso del costeo y con qué tasa.",
-        icon: Landmark,
         isAvailable: true,
     },
     {

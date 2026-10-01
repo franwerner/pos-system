@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation"
 import {
     Sidebar,
     SidebarContent,
-    SidebarFooter,
     SidebarGroup,
     SidebarGroupLabel,
     SidebarHeader,
@@ -27,6 +26,19 @@ export default function AdminSidebar() {
                 </Link>
             </SidebarHeader>
             <SidebarContent>
+                {/* Acción principal arriba de todo: desde cualquier pantalla de admin hay que poder volver al POS en un toque. */}
+                <SidebarGroup>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton asChild variant="outline" size="lg" tooltip="Punto de venta">
+                                <Link href="/pos">
+                                    <Store />
+                                    <span>Punto de venta</span>
+                                </Link>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarGroup>
                 <SidebarGroup>
                     <SidebarGroupLabel>Secciones</SidebarGroupLabel>
                     <SidebarMenu>
@@ -57,18 +69,6 @@ export default function AdminSidebar() {
                     </SidebarMenu>
                 </SidebarGroup>
             </SidebarContent>
-            <SidebarFooter>
-                <SidebarMenu>
-                    <SidebarMenuItem>
-                        <SidebarMenuButton asChild>
-                            <Link href="/pos">
-                                <Store />
-                                <span>Punto de venta</span>
-                            </Link>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                </SidebarMenu>
-            </SidebarFooter>
         </Sidebar>
     )
 }

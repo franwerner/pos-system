@@ -1,23 +1,19 @@
 "use client"
 
-import { Plus } from "lucide-react"
+import { Plus, Search } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/shared/components/ui/alert-dialog"
 import { Button } from "@/shared/components/ui/button"
-import { Loader } from "@/shared/components/loader.component"
+import { Card } from "@/shared/components/ui/card"
+import { Skeleton } from "@/shared/components/ui/skeleton"
+import { ConfirmDialog } from "@/shared/components/confirm-dialog.component"
+import { EmptyState } from "@/shared/components/empty-state.component"
+import { PageHeader } from "@/shared/components/page-header.component"
+import { TableSkeleton } from "@/shared/components/table-skeleton.component"
 import useGetAdminProducts from "../hooks/useGetAdminProducts.hook"
 import usePatchProduct from "../hooks/usePatchProduct.hook"
 import { type AdminProduct, type AdminProductFilter } from "../types/admin-product.type"
+import ProductCards from "./product-cards.component"
 import ProductFilters from "./product-filters.component"
 import ProductFormDialog from "./product-form-dialog.component"
 import ProductTable from "./product-table.component"
@@ -25,6 +21,31 @@ import ProductTable from "./product-table.component"
 const defaultFilter: AdminProductFilter = {
     search: "",
     onlyActive: true,
+}
+
+/** Estado "Cargando": encabezados reales (tabla) o tarjetas de Skeleton (celular). */
+function ProductsLoading() {
+    return (
+        <>
+            <div className="hidden md:block">
+                <TableSkeleton
+                    headers={["Nombre", "Categoría", "Precio", "Composición", "Acciones"]}
+                    widths={["w-[220px]", "w-40", "w-[90px]", "w-[110px]", "w-[120px]"]}
+                />
+            </div>
+            <div className="flex flex-col gap-2.5 md:hidden" aria-busy="true" aria-label="Cargando">
+                {Array.from({ length: 5 }, (_, i) => (
+                    <div key={i} className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3.5">
+                        <div className="flex justify-between gap-3">
+                            <Skeleton className="h-4 w-40" />
+                            <Skeleton className="h-4 w-16" />
+                        </div>
+                        <Skeleton className="h-3.5 w-28" />
+                    </div>
+                ))}
+            </div>
+        </>
+    )
 }
 
 export default function ProductsManager() {
@@ -61,33 +82,51 @@ export default function ProductsManager() {
 
     return (
         <div className="flex flex-col gap-6">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold">Productos</h1>
-                    <p className="text-sm text-muted-foreground">
-                        Lo que se vende, con la composición que descuenta stock en cada venta.
-                    </p>
-                </div>
-                <Button onClick={openCreateForm}>
-                    <Plus className="h-4 w-4" />
-                    Nuevo producto
-                </Button>
-            </div>
+            <PageHeader
+                title="Productos"
+                description="Lo que se vende, con la composición que descuenta stock en cada venta."
+                actions={(
+                    <Button size="lg" className="h-11 gap-2 md:h-12 md:px-6 md:text-base" onClick={openCreateForm}>
+                        <Plus className="size-4 md:size-5" aria-hidden />
+                        <span className="md:hidden">Nuevo</span>
+                        <span className="hidden md:inline">Nuevo producto</span>
+                    </Button>
+                )}
+            />
 
             <ProductFilters
                 filter={filter}
                 onFilterChange={(next) => setFilter((current) => ({ ...current, ...next }))}
             />
 
-            {isLoading
-                ? <Loader className="h-64" />
-                : (
-                    <ProductTable
-                        products={products ?? []}
-                        onEdit={openEditForm}
-                        onToggleActive={setProductToToggle}
+            {isLoading ? (
+                <ProductsLoading />
+            ) : (products ?? []).length === 0 ? (
+                <Card className="p-5">
+                    <EmptyState
+                        icon={Search}
+                        title="No hay productos que coincidan con el filtro."
+                        description="Probá con otro nombre o apagá “Solo activos”."
                     />
-                )}
+                </Card>
+            ) : (
+                <>
+                    <div className="hidden md:block">
+                        <ProductTable
+                            products={products ?? []}
+                            onEdit={openEditForm}
+                            onToggleActive={setProductToToggle}
+                        />
+                    </div>
+                    <div className="md:hidden">
+                        <ProductCards
+                            products={products ?? []}
+                            onEdit={openEditForm}
+                            onToggleActive={setProductToToggle}
+                        />
+                    </div>
+                </>
+            )}
 
             <ProductFormDialog
                 open={isFormOpen}
@@ -95,28 +134,19 @@ export default function ProductsManager() {
                 product={editingProduct}
             />
 
-            <AlertDialog
+            <ConfirmDialog
                 open={!!productToToggle}
-                onOpenChange={(open) => !open && setProductToToggle(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>
-                            {productToToggle?.is_active ? "Desactivar producto" : "Reactivar producto"}
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                            {productToToggle?.is_active
-                                ? `"${productToToggle?.name}" deja de ofrecerse en el punto de venta, pero sus ventas se conservan.`
-                                : `"${productToToggle?.name}" vuelve a estar disponible en el punto de venta.`}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={confirmToggleActive} disabled={patchProduct.isPending}>
-                            Confirmar
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                onOpenChange={(open) => !open && setProductToToggle(null)}
+                onConfirm={confirmToggleActive}
+                title={productToToggle?.is_active ? "Desactivar producto" : "Reactivar producto"}
+                description={
+                    productToToggle?.is_active
+                        ? `"${productToToggle?.name}" deja de aparecer en el punto de venta. Las ventas ya hechas se conservan y podés reactivarlo cuando quieras.`
+                        : `"${productToToggle?.name}" vuelve a aparecer en el punto de venta.`
+                }
+                confirmLabel={productToToggle?.is_active ? "Desactivar" : "Reactivar"}
+                pending={patchProduct.isPending}
+            />
         </div>
     )
 }

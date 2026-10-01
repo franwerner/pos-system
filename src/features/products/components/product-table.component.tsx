@@ -1,8 +1,8 @@
 "use client"
 
-import { Pencil } from "lucide-react"
+import { Pencil, Power } from "lucide-react"
 import { Badge } from "@/shared/components/ui/badge"
-import { Button } from "@/shared/components/ui/button"
+import { Card } from "@/shared/components/ui/card"
 import {
     Table,
     TableBody,
@@ -11,7 +11,9 @@ import {
     TableHeader,
     TableRow,
 } from "@/shared/components/ui/table"
-import formatCurrency from "@/shared/utils/formatCurrency.util"
+import { Money } from "@/shared/components/money.component"
+import { InactiveBadge, RowActions } from "@/shared/components/row-actions.component"
+import { cn } from "@/shared/utils/cn.util"
 import { type AdminProduct } from "../types/admin-product.type"
 
 interface ProductTableProps {
@@ -20,17 +22,22 @@ interface ProductTableProps {
     onToggleActive: (product: AdminProduct) => void
 }
 
-export default function ProductTable({ products, onEdit, onToggleActive }: ProductTableProps) {
-    if (products.length === 0) {
-        return (
-            <p className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-                No hay productos que coincidan con el filtro.
-            </p>
-        )
-    }
+function CompositionBadge({ count }: { count: number }) {
+    return count === 0 ? (
+        <Badge variant="secondary" className="rounded-full font-semibold text-muted-foreground">
+            Sin composición
+        </Badge>
+    ) : (
+        <Badge className="rounded-full border-transparent bg-accent font-semibold text-accent-foreground">
+            {count} insumo{count > 1 ? "s" : ""}
+        </Badge>
+    )
+}
 
+/** Tabla de escritorio (md+): la versión celular es `ProductCards`. */
+export default function ProductTable({ products, onEdit, onToggleActive }: ProductTableProps) {
     return (
-        <div className="rounded-lg border bg-card">
+        <Card className="overflow-hidden p-0">
             <Table>
                 <TableHeader>
                     <TableRow>
@@ -43,42 +50,38 @@ export default function ProductTable({ products, onEdit, onToggleActive }: Produ
                 </TableHeader>
                 <TableBody>
                     {products.map((product) => (
-                        <TableRow key={product.id} className={product.is_active ? undefined : "opacity-60"}>
-                            <TableCell className="font-medium">
-                                <div className="flex items-center gap-2">
+                        <TableRow key={product.id} className={cn(!product.is_active && "opacity-55")}>
+                            <TableCell className="font-semibold">
+                                <span className="flex items-center gap-2">
                                     {product.name}
-                                    {!product.is_active && <Badge variant="outline">Inactivo</Badge>}
-                                </div>
+                                    {!product.is_active && <InactiveBadge />}
+                                </span>
                             </TableCell>
-                            <TableCell>{product.category?.name ?? "Sin categoría"}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(product.price)}</TableCell>
-                            <TableCell>
-                                {product.composition_count === 0
-                                    ? <Badge variant="outline">Sin composición</Badge>
-                                    : (
-                                        <span className="text-sm text-muted-foreground">
-                                            {product.composition_count} insumo{product.composition_count > 1 ? "s" : ""}
-                                        </span>
-                                    )}
+                            <TableCell className={cn(!product.category && "text-muted-foreground")}>
+                                {product.category?.name ?? "Sin categoría"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                                <Money value={product.price} size="sm" className="text-[15px]" />
                             </TableCell>
                             <TableCell>
-                                <div className="flex justify-end gap-2">
-                                    <Button size="sm" variant="outline" onClick={() => onEdit(product)}>
-                                        <Pencil className="h-4 w-4" />
-                                        Editar
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant={product.is_active ? "destructive" : "secondary"}
-                                        onClick={() => onToggleActive(product)}>
-                                        {product.is_active ? "Desactivar" : "Reactivar"}
-                                    </Button>
-                                </div>
+                                <CompositionBadge count={product.composition_count} />
+                            </TableCell>
+                            <TableCell>
+                                <RowActions
+                                    actions={[
+                                        { label: "Editar", icon: Pencil, onClick: () => onEdit(product) },
+                                        {
+                                            label: product.is_active ? "Desactivar" : "Reactivar",
+                                            icon: Power,
+                                            onClick: () => onToggleActive(product),
+                                        },
+                                    ]}
+                                />
                             </TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
             </Table>
-        </div>
+        </Card>
     )
 }

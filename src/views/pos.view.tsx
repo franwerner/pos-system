@@ -1,38 +1,104 @@
-import LogoutButton from "@/features/auth/components/logout-button.component";
-import CartSidebar from "@/features/cart/components/cart-sidebar.component";
-import CashSessionStatus from "@/features/cash/components/cash-session-status.component";
-import PendingOrdersButton from "@/features/order/components/pending-orders-button.component";
-import CategorySidebar from "@/features/products/components/category-sidebar.component";
-import ProductGrid from "@/features/products/components/product-grid.component";
-import SearchProduct from "@/features/products/components/search-product.component";
-import { SidebarProvider, SidebarTrigger } from "@/shared/components/ui/sidebar";
+"use client"
 
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import useLogout from "@/features/auth/hooks/useLogout.hook"
+import useGetSession from "@/features/auth/hooks/useGetSession.hook"
+import { CartSheet } from "@/features/cart/components/cart-sheet.component"
+import { useCart } from "@/features/cart/context/cart-context"
+import useGetOpenCashSession from "@/features/cash/hooks/useGetOpenCashSession.hook"
+import useGetOrders from "@/features/order/hooks/useGetOrders.hook"
+import CategoryChips from "@/features/products/components/category-chips.component"
+import CategorySidebar from "@/features/products/components/category-sidebar.component"
+import ProductGrid from "@/features/products/components/product-grid.component"
+import { useProductFilterContext } from "@/features/products/provider/product-filter.provider"
+import { resolveCategoryVisual } from "@/features/products/services/resolveCategoryVisual.service"
+import { CartPanel } from "@/shared/components/cart.component"
+import { PosHeader } from "@/shared/components/pos-header.component"
 
 export default function POSView() {
-    return (
-        <SidebarProvider>
-            <div className="flex w-full h-screen bg-background">
-                <CategorySidebar />
-                <main className="flex-1 w-full flex flex-col h-screen overflow-hidden">
+    const router = useRouter()
+    const { filter, setFilter } = useProductFilterContext()
+    const { data: session } = useGetSession()
+    const { logout } = useLogout()
+    const { data: cashSession } = useGetOpenCashSession()
+    const { data: pendingOrders } = useGetOrders("pending")
+    const { cart, removeFromCart, updateQuantity, getCalculatedCart } = useCart()
 
-                    <div className="flex flex-col 2xl:flex-row py-4 pl-4 2xl:pl-0 pr-4 gap-2 items-center justify-between border-b">
-                        <div className="flex justify-start items-center w-full min-w-0">
-                            <SidebarTrigger className="p-0 cursor-pointer" />
-                            <h1 className="text-2xl font-bold self-center whitespace-nowrap">Punto de venta</h1>
-                            <div className="ml-4">
-                                <CashSessionStatus />
-                            </div>
-                        </div>
-                        <div className="flex w-full 2xl:w-auto shrink-0 items-center gap-2">
-                            <SearchProduct className="w-full 2xl:w-90" />
-                            <PendingOrdersButton />
-                            <LogoutButton />
-                        </div>
-                    </div>
+    // El buscador tipea local y solo dispara el filtro real (que refetchea productos)
+    // 500 ms después de la última tecla; sincroniza con el contexto si algo lo limpia
+    // desde afuera (ej. "Borrar búsqueda" del estado sin resultados).
+    const [search, setSearch] = useState(filter.search)
+    useEffect(() => setSearch(filter.search), [filter.search])
+    useEffect(() => {
+        const timeout = setTimeout(() => setFilter({ search }), 500)
+        return () => clearTimeout(timeout)
+    }, [search, setFilter])
+
+    const { itemCount, subTotal } = getCalculatedCart()
+    const cartItems = cart.map((item) => ({
+        id: String(item.id),
+        name: item.name,
+        unitPrice: item.price,
+        quantity: item.quantity,
+        lineTotal: item.price * item.quantity,
+        imageUrl: item.img_url ?? undefined,
+        ...resolveCategoryVisual(item.category?.name),
+    }))
+
+    // Con cantidad 1, restar saca la línea del carrito en vez de dejarla en 0 (bug real
+    // que el diseño hizo explícito: "no existe cantidad 0" en el carrito del POS).
+    const handleDecrease = (id: string) => {
+        const numericId = Number(id)
+        const item = cart.find((cartItem) => cartItem.id === numericId)
+        if (!item) return
+        if (item.quantity <= 1) removeFromCart(numericId)
+        else updateQuantity(numericId, item.quantity - 1)
+    }
+    const handleIncrease = (id: string) => {
+        const numericId = Number(id)
+        const item = cart.find((cartItem) => cartItem.id === numericId)
+        if (!item) return
+        updateQuantity(numericId, item.quantity + 1)
+    }
+    const handleCheckout = () => router.push("/pos/checkout")
+
+    const header = {
+        search,
+        onSearchChange: setSearch,
+        cajaOpen: !!cashSession,
+        cajaInitial: cashSession?.opening_amount,
+        pendingCount: pendingOrders?.length ?? 0,
+        userName: session?.username,
+        onLogout: logout,
+    }
+
+    const cartProps = {
+        items: cartItems,
+        itemCount,
+        subtotal: subTotal,
+        onIncrease: handleIncrease,
+        onDecrease: handleDecrease,
+        onCheckout: handleCheckout,
+    }
+
+    return (
+        <div className="flex h-dvh flex-col bg-background text-foreground">
+            <div className="portrait:hidden">
+                <PosHeader {...header} />
+            </div>
+            <div className="landscape:hidden">
+                <PosHeader {...header} compact />
+            </div>
+            <CategoryChips className="landscape:hidden" />
+            <div className="flex min-h-0 flex-1">
+                <CategorySidebar className="portrait:hidden" />
+                <main className="flex min-w-0 flex-1 flex-col gap-3.5 overflow-y-auto p-[18px] portrait:pb-32">
                     <ProductGrid />
                 </main>
-                <CartSidebar />
+                <CartPanel {...cartProps} className="portrait:hidden" />
             </div>
-        </SidebarProvider>
+            <CartSheet {...cartProps} className="landscape:hidden" />
+        </div>
     )
 }

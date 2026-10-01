@@ -1,6 +1,7 @@
 import {
     type ManualMovementType,
     type MovementDirection,
+    type StockStatus,
 } from "../types/stock.type"
 
 export const sumStockMovements = (movements: { quantity: number }[]): number =>
@@ -32,3 +33,11 @@ export const isBelowMinimum = (currentStock: number, minStock: number): boolean 
 
 // Una venta puede dejar el stock en negativo: no se bloquea el cobro, se muestra.
 export const isNegativeStock = (currentStock: number): boolean => currentStock < 0
+
+// Un solo estado para pintar la fila/tarjeta: negativo pesa más que bajo mínimo, nunca
+// se muestran los dos badges a la vez (ver StockBadge en stock-table.component.tsx).
+export const resolveStockStatus = (currentStock: number, minStock: number): StockStatus => {
+    if (isNegativeStock(currentStock)) return "negative"
+    if (isBelowMinimum(currentStock, minStock)) return "low"
+    return "ok"
+}

@@ -1,6 +1,7 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
+import { Loader2 } from "lucide-react"
 import { useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
@@ -17,6 +18,7 @@ import {
 import {
     Form,
     FormControl,
+    FormDescription,
     FormField,
     FormItem,
     FormLabel,
@@ -92,6 +94,7 @@ export default function FixedCostFormDialog({
                     toast.success("Costo fijo actualizado")
                     onOpenChange(false)
                 },
+                onError: (error) => toast.error(error.message),
             })
             return
         }
@@ -101,6 +104,7 @@ export default function FixedCostFormDialog({
                 toast.success("Costo fijo cargado")
                 onOpenChange(false)
             },
+            onError: (error) => toast.error(error.message),
         })
     }
 
@@ -112,12 +116,12 @@ export default function FixedCostFormDialog({
                 <DialogHeader>
                     <DialogTitle>{fixedCost ? "Editar costo fijo" : "Nuevo costo fijo"}</DialogTitle>
                     <DialogDescription>
-                        Gastos del mes que no dependen de cuánto se venda: alquiler, servicios, sueldos.
+                        Se suma al total del mes y cambia al instante cuánto necesitás vender.
                     </DialogDescription>
                 </DialogHeader>
 
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
                         <FormField
                             control={form.control}
                             name="concept"
@@ -125,8 +129,11 @@ export default function FixedCostFormDialog({
                                 <FormItem>
                                     <FormLabel>Concepto</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="Alquiler del local" {...field} />
+                                        <Input placeholder="Ej.: Alquiler del local" className="h-11 sm:h-10" {...field} />
                                     </FormControl>
+                                    <FormDescription>
+                                        Cualquier gasto que se paga todos los meses, también la cuota de monotributo.
+                                    </FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -140,19 +147,28 @@ export default function FixedCostFormDialog({
                                     <FormItem>
                                         <FormLabel>Monto</FormLabel>
                                         <FormControl>
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                name={field.name}
-                                                ref={field.ref}
-                                                onBlur={field.onBlur}
-                                                value={displayNumber(field.value)}
-                                                onChange={(event) => field.onChange(
-                                                    parseNumericInput(event.target.value, event.target.valueAsNumber),
-                                                )}
-                                            />
+                                            <div className="relative">
+                                                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                                                    $
+                                                </span>
+                                                <Input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    inputMode="decimal"
+                                                    placeholder="0"
+                                                    name={field.name}
+                                                    ref={field.ref}
+                                                    onBlur={field.onBlur}
+                                                    value={displayNumber(field.value)}
+                                                    onChange={(event) => field.onChange(
+                                                        parseNumericInput(event.target.value, event.target.valueAsNumber),
+                                                    )}
+                                                    className="h-11 pl-7 tabular-nums sm:h-10"
+                                                />
+                                            </div>
                                         </FormControl>
+                                        <FormDescription>Lo que pagás por este concepto en el mes.</FormDescription>
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -165,7 +181,7 @@ export default function FixedCostFormDialog({
                                     <FormItem>
                                         <FormLabel>Mes</FormLabel>
                                         <FormControl>
-                                            <Input type="month" {...field} />
+                                            <Input type="month" className="h-11 sm:h-10" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -174,11 +190,14 @@ export default function FixedCostFormDialog({
                         </div>
 
                         <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
                                 Cancelar
                             </Button>
-                            <Button type="submit" disabled={isPending}>
-                                {fixedCost ? "Guardar cambios" : "Cargar costo fijo"}
+                            <Button type="submit" disabled={isPending} className="gap-2">
+                                {isPending && <Loader2 className="size-4 animate-spin" aria-hidden />}
+                                {isPending
+                                    ? "Guardando…"
+                                    : fixedCost ? "Guardar cambios" : "Crear costo fijo"}
                             </Button>
                         </DialogFooter>
                     </form>

@@ -259,4 +259,21 @@ describe("calculateCashCount", () => {
         expect(() => calculateCashCount({ ...baseInput, sales: [], countedAmount: -1 }))
             .toThrowError(/monto contado/)
     })
+
+    it("avisa cuando ningún método de pago cuenta como efectivo", () => {
+        const count = calculateCashCount({
+            ...baseInput,
+            cashPaymentMethodIds: [],
+            sales: [{ payment_method_id: 2, total: 5000 }],
+        })
+
+        expect(count.noCashMethod).toBe(true)
+        expect(count.cashSalesTotal).toBe(0)
+    })
+
+    it("no avisa cuando hay un método de pago que cuenta como efectivo", () => {
+        const count = calculateCashCount({ ...baseInput, sales: [] })
+
+        expect(count.noCashMethod).toBe(false)
+    })
 })

@@ -1,6 +1,7 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
+import { Loader2 } from "lucide-react"
 import { useEffect, useRef } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
@@ -36,6 +37,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/shared/components/ui/select"
+import { Separator } from "@/shared/components/ui/separator"
 import { Textarea } from "@/shared/components/ui/textarea"
 import { useGetCategories } from "../hooks/useGetCategories.hook"
 import useGetProductComposition from "../hooks/useGetProductComposition.hook"
@@ -195,185 +197,222 @@ export default function ProductFormDialog({ open, onOpenChange, product }: Produ
     const watchedLines = form.watch("lines")
     const watchedPrice = form.watch("price")
     const watchedTargetMargin = form.watch("target_margin_percentage")
+    const watchedName = form.watch("name")
 
     const isPending = postProduct.isPending || patchProduct.isPending
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+            <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl lg:max-w-[1180px]">
                 <DialogHeader>
                     <DialogTitle>{product ? "Editar producto" : "Nuevo producto"}</DialogTitle>
                     <DialogDescription>
-                        Lo que se vende. Su composición es lo que descuenta del stock en cada venta.
+                        {product
+                            ? `${watchedName || product.name} · los cambios se ven en el POS al guardar.`
+                            : "Cargá el nombre, el precio y la receta. El costo aparece a la derecha."}
                     </DialogDescription>
                 </DialogHeader>
 
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[2fr_1fr_1fr]">
-                            <FormField
-                                control={form.control}
-                                name="name"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Nombre</FormLabel>
-                                        <FormControl>
-                                            <Input placeholder="Hamburguesa clásica" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-6">
+                        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+                            <div className="flex min-w-0 flex-col gap-[18px]">
+                                <div className="grid gap-3.5 sm:grid-cols-2">
+                                    <FormField
+                                        control={form.control}
+                                        name="name"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Nombre</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="Ej.: Hamburguesa clásica" className="h-11" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
 
-                            <FormField
-                                control={form.control}
-                                name="price"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Precio de venta</FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                name={field.name}
-                                                ref={field.ref}
-                                                onBlur={field.onBlur}
-                                                value={displayNumber(field.value)}
-                                                onChange={(event) => field.onChange(
-                                                    parseNumericInput(event.target.value, event.target.valueAsNumber),
-                                                )}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                                    <FormField
+                                        control={form.control}
+                                        name="price"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Precio de venta</FormLabel>
+                                                <FormControl>
+                                                    <div className="relative">
+                                                        <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                                                        <Input
+                                                            type="number"
+                                                            min="0"
+                                                            step="0.01"
+                                                            inputMode="numeric"
+                                                            name={field.name}
+                                                            ref={field.ref}
+                                                            onBlur={field.onBlur}
+                                                            value={displayNumber(field.value)}
+                                                            onChange={(event) => field.onChange(
+                                                                parseNumericInput(event.target.value, event.target.valueAsNumber),
+                                                            )}
+                                                            className="h-11 pl-8 tabular-nums"
+                                                        />
+                                                    </div>
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
 
-                            <FormField
-                                control={form.control}
-                                name="target_margin_percentage"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Margen objetivo (%)</FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                max="99.99"
-                                                step="0.01"
-                                                placeholder="Sin margen"
-                                                name={field.name}
-                                                ref={field.ref}
-                                                onBlur={field.onBlur}
-                                                value={displayOptionalNumber(field.value)}
-                                                onChange={(event) => field.onChange(
-                                                    parseOptionalNumericInput(
-                                                        event.target.value,
-                                                        event.target.valueAsNumber,
-                                                    ),
-                                                )}
-                                            />
-                                        </FormControl>
-                                        <FormDescription>
-                                            Vacío deja al producto sin precio sugerido.
-                                        </FormDescription>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
-
-                        <FormField
-                            control={form.control}
-                            name="category_id"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Categoría</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder="Sin categoría" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value={NO_CATEGORY}>Sin categoría</SelectItem>
-                                            {categoryOptions.map((option) => (
-                                                <SelectItem key={option.id} value={String(option.id)}>
-                                                    {option.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        <FormField
-                            control={form.control}
-                            name="img_url"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Imagen (opcional)</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            inputMode="url"
-                                            placeholder="https://ejemplo.com/hamburguesa.jpg"
-                                            {...field}
+                                    {/* Celular / tablet: el costeo va justo después del precio (P1-Productos-movil). */}
+                                    <div className="sm:col-span-2 lg:hidden">
+                                        <ProductCostingPreview
+                                            lines={watchedLines}
+                                            price={watchedPrice}
+                                            targetMarginPercentage={watchedTargetMargin}
+                                            supplies={supplies ?? []}
+                                            layout="stacked"
+                                            switchId="ver-detalle-celular"
                                         />
-                                    </FormControl>
+                                    </div>
+
+                                    <FormField
+                                        control={form.control}
+                                        name="target_margin_percentage"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Margen objetivo (%)</FormLabel>
+                                                <FormControl>
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        max="99.99"
+                                                        step="0.01"
+                                                        placeholder="Sin margen"
+                                                        name={field.name}
+                                                        ref={field.ref}
+                                                        onBlur={field.onBlur}
+                                                        value={displayOptionalNumber(field.value)}
+                                                        onChange={(event) => field.onChange(
+                                                            parseOptionalNumericInput(
+                                                                event.target.value,
+                                                                event.target.valueAsNumber,
+                                                            ),
+                                                        )}
+                                                        className="h-11"
+                                                    />
+                                                </FormControl>
+                                                <FormDescription>
+                                                    Vacío deja al producto sin precio sugerido. Este margen
+                                                    tiene que cubrir impuestos, comisiones y gastos fijos: hoy
+                                                    no se descuentan del costeo.
+                                                </FormDescription>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    <FormField
+                                        control={form.control}
+                                        name="category_id"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Categoría</FormLabel>
+                                                <Select onValueChange={field.onChange} value={field.value}>
+                                                    <FormControl>
+                                                        <SelectTrigger className="h-11 w-full">
+                                                            <SelectValue placeholder="Sin categoría" />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        <SelectItem value={NO_CATEGORY}>Sin categoría</SelectItem>
+                                                        {categoryOptions.map((option) => (
+                                                            <SelectItem key={option.id} value={String(option.id)}>
+                                                                {option.label}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+
+                                <div className="grid gap-3.5 sm:grid-cols-2">
+                                    <FormField
+                                        control={form.control}
+                                        name="img_url"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Imagen (opcional)</FormLabel>
+                                                <FormControl>
+                                                    <Input
+                                                        inputMode="url"
+                                                        placeholder="https://ejemplo.com/hamburguesa.jpg"
+                                                        className="h-11"
+                                                        {...field}
+                                                    />
+                                                </FormControl>
+                                                <FormDescription>
+                                                    URL de la foto que se ve en el POS. Sin imagen, la tarjeta
+                                                    muestra un ícono con el nombre del producto.
+                                                </FormDescription>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+
+                                    <FormField
+                                        control={form.control}
+                                        name="description"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Descripción (opcional)</FormLabel>
+                                                <FormControl>
+                                                    <Textarea rows={2} placeholder="Con papas" {...field} />
+                                                </FormControl>
+                                                <FormDescription>Hasta 500 caracteres.</FormDescription>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+
+                                <Separator />
+
+                                <div className="flex flex-col gap-2.5">
+                                    <p className="text-[13px] text-muted-foreground">
+                                        Qué consume este producto cada vez que se vende una unidad.
+                                    </p>
+                                    <CompositionLinesField
+                                        supplies={supplies ?? []}
+                                        emptyMessage="Sin composición: la venta de este producto no descuenta stock."
+                                    />
                                     <FormDescription>
-                                        URL de la foto que se ve en el POS. Sin imagen, la tarjeta
-                                        muestra un ícono con el nombre del producto.
+                                        Un producto sin líneas no genera movimientos de stock al venderse.
                                     </FormDescription>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                                </div>
+                            </div>
 
-                        <FormField
-                            control={form.control}
-                            name="description"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Descripción (opcional)</FormLabel>
-                                    <FormControl>
-                                        <Textarea rows={2} placeholder="Con papas" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        <div className="rounded-lg border bg-muted/30 p-3">
-                            <p className="mb-3 text-sm text-muted-foreground">
-                                Qué consume este producto cada vez que se vende una unidad.
-                            </p>
-                            <CompositionLinesField
-                                supplies={supplies ?? []}
-                                emptyMessage="Sin composición: la venta de este producto no descuenta stock."
-                            />
-                            <FormDescription className="mt-3">
-                                Un producto sin líneas no genera movimientos de stock al venderse.
-                            </FormDescription>
-
-                            <div className="mt-4">
+                            {/* Escritorio: costeo en la columna derecha. */}
+                            <div className="hidden lg:block">
                                 <ProductCostingPreview
                                     lines={watchedLines}
                                     price={watchedPrice}
                                     targetMarginPercentage={watchedTargetMargin}
                                     supplies={supplies ?? []}
+                                    layout="row"
+                                    switchId="ver-detalle-escritorio"
                                 />
                             </div>
                         </div>
 
                         <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
                                 Cancelar
                             </Button>
-                            <Button type="submit" disabled={isPending}>
-                                {product ? "Guardar cambios" : "Crear producto"}
+                            <Button type="submit" disabled={isPending} className="gap-2">
+                                {isPending && <Loader2 className="size-4 animate-spin" aria-hidden />}
+                                {isPending ? "Guardando…" : product ? "Guardar cambios" : "Crear producto"}
                             </Button>
                         </DialogFooter>
                     </form>

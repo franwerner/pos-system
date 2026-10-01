@@ -1,36 +1,17 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
+import { Loader2 } from "lucide-react"
 import { useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
 import { Button } from "@/shared/components/ui/button"
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/shared/components/ui/dialog"
-import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-} from "@/shared/components/ui/form"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/components/ui/form"
 import { Input } from "@/shared/components/ui/input"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/shared/components/ui/select"
-import { Textarea } from "@/shared/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/components/ui/select"
+import { DialogShell } from "@/shared/components/dialog-shell.component"
+import { Money } from "@/shared/components/money.component"
 import formatCurrency from "@/shared/utils/formatCurrency.util"
 import useGetProducibleSupplies from "../hooks/useGetProducibleSupplies.hook"
 import useGetProductionComponents from "../hooks/useGetProductionComponents.hook"
@@ -46,8 +27,8 @@ const productionFormSchema = z.object({
         .number({ error: "Elegí un preparado" })
         .refine((value) => value > 0, "Elegí un preparado"),
     quantity: z
-        .number({ error: "La cantidad debe ser mayor a 0" })
-        .refine((value) => value > 0, "La cantidad debe ser mayor a 0"),
+        .number({ error: "Cargá cuántas unidades se produjeron (más de 0)." })
+        .refine((value) => value > 0, "Cargá cuántas unidades se produjeron (más de 0)."),
     produced_at: z.string().min(1, "La fecha es obligatoria"),
     note: z.string().trim().max(500, "La nota es demasiado larga"),
 })
@@ -72,6 +53,67 @@ const displayNumber = (value: number) => (Number.isNaN(value) ? "" : value)
 
 const toTimestamp = (date: string) => new Date(`${date}T12:00:00`).toISOString()
 
+/** Resumen de escritorio: el costo unitario es el protagonista. */
+function SummaryCards({ pending, message, consumed, unitCost, recipeNote }: {
+    pending: boolean
+    message: string
+    consumed: number
+    unitCost: number
+    recipeNote: string
+}) {
+    return (
+        <div className="hidden grid-cols-[0.8fr_1.2fr] gap-3 sm:grid">
+            <div className="flex flex-col justify-center gap-1.5 rounded-xl border border-border bg-card px-[18px] py-4">
+                <span className="text-sm font-semibold text-muted-foreground">Costo consumido</span>
+                {pending
+                    ? <span className="text-sm text-muted-foreground">{message}</span>
+                    : <Money value={consumed} decimals={2} className="text-2xl" />}
+                <span className="text-[13px] text-muted-foreground">total de la tanda</span>
+            </div>
+            <div className="flex flex-col gap-1.5 rounded-xl border-[1.5px] border-brand bg-accent px-[18px] py-4">
+                <span className="text-sm font-semibold text-accent-foreground">Costo unitario</span>
+                {pending ? (
+                    <span className="text-sm text-muted-foreground">{message}</span>
+                ) : (
+                    <>
+                        <span className="flex items-baseline gap-1.5">
+                            <Money value={unitCost} decimals={2} size="hero" />
+                            <span className="text-sm text-muted-foreground">por u</span>
+                        </span>
+                        <span className="text-[13px] text-accent-foreground">{recipeNote}</span>
+                    </>
+                )}
+            </div>
+        </div>
+    )
+}
+
+/** Resumen de celular: fijo en el pie, arriba de los botones. */
+function SummaryBar({ pending, message, consumed, unitCost }: {
+    pending: boolean
+    message: string
+    consumed: number
+    unitCost: number
+}) {
+    if (pending) {
+        return (
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-muted px-3.5 py-3 sm:hidden">
+                <span className="whitespace-nowrap text-sm font-semibold">Costo unitario</span>
+                <span className="text-right text-sm text-muted-foreground">{message}</span>
+            </div>
+        )
+    }
+    return (
+        <div className="flex items-center justify-between gap-3 rounded-xl border-[1.5px] border-brand bg-accent px-3.5 py-2.5 sm:hidden">
+            <div className="flex flex-col">
+                <span className="text-sm font-semibold text-accent-foreground">Costo unitario</span>
+                <span className="text-[13px] tabular-nums text-muted-foreground">Consumido {formatCurrency(consumed)}</span>
+            </div>
+            <Money value={unitCost} decimals={2} size="lg" className="text-[28px]" />
+        </div>
+    )
+}
+
 interface ProductionFormDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
@@ -92,17 +134,27 @@ export default function ProductionFormDialog({ open, onOpenChange }: ProductionF
 
     const supplyId = form.watch("supply_id")
     const quantity = form.watch("quantity")
+    const supplySelected = !Number.isNaN(supplyId)
 
     const selectedSupply = (supplies ?? []).find((supply) => supply.id === supplyId)
-    const { data: components } = useGetProductionComponents(
-        Number.isNaN(supplyId) ? null : supplyId,
-    )
+    const { data: components } = useGetProductionComponents(supplySelected ? supplyId : null)
 
     const producedQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 0
     const lines = components ?? []
+    const noComponents = supplySelected && lines.length === 0
 
     const totalCost = producedQuantity > 0 ? calculateProductionCost(lines, producedQuantity) : 0
     const unitCost = producedQuantity > 0 ? calculateProductionUnitCost(lines, producedQuantity) : 0
+
+    // El resumen nunca muestra $0: mientras falte un dato, dice qué falta en su lugar.
+    const summaryPending = !supplySelected || noComponents || producedQuantity <= 0
+    const summaryMessage = !supplySelected
+        ? "Aparece al elegir un preparado"
+        : noComponents
+            ? "Sin componentes no hay costo"
+            : "Cargá las unidades"
+
+    const submitDisabled = noComponents
 
     const onSubmit = (values: ProductionFormValues) => {
         if (lines.length === 0) {
@@ -120,32 +172,61 @@ export default function ProductionFormDialog({ open, onOpenChange }: ProductionF
                 toast.success("Producción registrada: bajaron los componentes y subió el preparado")
                 onOpenChange(false)
             },
+            onError: (error) => toast.error(error.message),
         })
     }
 
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-                <DialogHeader>
-                    <DialogTitle>Nueva producción</DialogTitle>
-                    <DialogDescription>
-                        Descuenta del stock los componentes del preparado e ingresa las unidades producidas.
-                    </DialogDescription>
-                </DialogHeader>
+    const submitting = postProduction.isPending
 
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    return (
+        <DialogShell
+            open={open}
+            onOpenChange={onOpenChange}
+            title="Nueva producción"
+            description="Registrá una tanda: bajan los componentes y sube el preparado."
+            mobileBarTitle="Nueva producción"
+            widthClass="sm:max-w-[860px]"
+            footer={
+                <>
+                    <SummaryBar pending={summaryPending} message={summaryMessage} consumed={totalCost} unitCost={unitCost} />
+                    <div className="flex gap-2.5 sm:contents">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="h-12 sm:h-10"
+                            onClick={() => onOpenChange(false)}
+                            disabled={submitting}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="submit"
+                            form="production-form"
+                            disabled={submitDisabled || submitting}
+                            className="h-12 flex-1 gap-2 sm:h-10 sm:flex-none"
+                        >
+                            {submitting
+                                ? (<><Loader2 className="size-4 animate-spin" aria-hidden /> Guardando…</>)
+                                : "Registrar producción"}
+                        </Button>
+                    </div>
+                </>
+            }
+        >
+            <Form {...form}>
+                <form id="production-form" onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+                    <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5">
                         <FormField
                             control={form.control}
                             name="supply_id"
                             render={({ field }) => (
-                                <FormItem>
+                                <FormItem className="col-span-2 sm:col-span-1">
                                     <FormLabel>Preparado</FormLabel>
                                     <Select
                                         onValueChange={(value) => field.onChange(Number(value))}
                                         value={Number.isNaN(field.value) ? "" : String(field.value)}>
                                         <FormControl>
-                                            <SelectTrigger className="w-full">
+                                            <SelectTrigger className="h-11 w-full sm:h-10">
                                                 <SelectValue placeholder="Elegí un preparado" />
                                             </SelectTrigger>
                                         </FormControl>
@@ -157,57 +238,56 @@ export default function ProductionFormDialog({ open, onOpenChange }: ProductionF
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                    <span className="text-[13px] text-muted-foreground">
+                                        Solo preparados activos y con componentes cargados.
+                                    </span>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
 
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <FormField
-                                control={form.control}
-                                name="quantity"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>
-                                            Unidades producidas {selectedSupply && `(${selectedSupply.unit})`}
-                                        </FormLabel>
-                                        <FormControl>
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                step="0.001"
-                                                name={field.name}
-                                                ref={field.ref}
-                                                onBlur={field.onBlur}
-                                                value={displayNumber(field.value)}
-                                                onChange={(event) => field.onChange(
-                                                    parseNumericInput(event.target.value, event.target.valueAsNumber),
-                                                )}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                        <FormField
+                            control={form.control}
+                            name="quantity"
+                            render={({ field }) => (
+                                <FormItem className="col-span-2 sm:col-span-1">
+                                    <FormLabel>
+                                        Unidades producidas {selectedSupply && `(${selectedSupply.unit})`}
+                                    </FormLabel>
+                                    <FormControl>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.001"
+                                            inputMode="decimal"
+                                            placeholder="0"
+                                            className="h-11 tabular-nums sm:h-10"
+                                            name={field.name}
+                                            ref={field.ref}
+                                            onBlur={field.onBlur}
+                                            value={displayNumber(field.value)}
+                                            onChange={(event) => field.onChange(
+                                                parseNumericInput(event.target.value, event.target.valueAsNumber),
+                                            )}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
-                            <FormField
-                                control={form.control}
-                                name="produced_at"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Fecha</FormLabel>
-                                        <FormControl>
-                                            <Input type="date" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
-
-                        <ProductionComponentsPreview
-                            components={lines}
-                            producedQuantity={producedQuantity}
+                        <FormField
+                            control={form.control}
+                            name="produced_at"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Fecha</FormLabel>
+                                    <FormControl>
+                                        <Input type="date" className="h-11 tabular-nums sm:h-10" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
                         />
 
                         <FormField
@@ -217,35 +297,31 @@ export default function ProductionFormDialog({ open, onOpenChange }: ProductionF
                                 <FormItem>
                                     <FormLabel>Nota (opcional)</FormLabel>
                                     <FormControl>
-                                        <Textarea rows={2} placeholder="Tanda de la mañana" {...field} />
+                                        <Input placeholder="Ej.: Tanda de la mañana" className="h-11 sm:h-10" {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
+                    </div>
 
-                        <div className="flex flex-col gap-2 rounded-lg border bg-muted/40 p-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="flex items-center justify-between gap-4 sm:justify-start">
-                                <span className="text-sm text-muted-foreground">Costo consumido</span>
-                                <span className="font-medium">{formatCurrency(totalCost)}</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-4 sm:justify-start">
-                                <span className="text-sm text-muted-foreground">Costo unitario</span>
-                                <span className="text-lg font-semibold">{formatCurrency(unitCost)}</span>
-                            </div>
-                        </div>
+                    <ProductionComponentsPreview
+                        supplySelected={supplySelected}
+                        supplyName={selectedSupply?.name}
+                        supplyUnit={selectedSupply?.unit}
+                        components={lines}
+                        producedQuantity={producedQuantity}
+                    />
 
-                        <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                                Cancelar
-                            </Button>
-                            <Button type="submit" disabled={postProduction.isPending}>
-                                Registrar producción
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </Form>
-            </DialogContent>
-        </Dialog>
+                    <SummaryCards
+                        pending={summaryPending}
+                        message={summaryMessage}
+                        consumed={totalCost}
+                        unitCost={unitCost}
+                        recipeNote={`Este es el costo que va a usar cada receta con ${selectedSupply?.name ?? "este preparado"}.`}
+                    />
+                </form>
+            </Form>
+        </DialogShell>
     )
 }

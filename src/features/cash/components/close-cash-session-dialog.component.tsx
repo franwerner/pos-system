@@ -1,40 +1,27 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
+import { Loader2, LockKeyhole } from "lucide-react"
 import { useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
 import { Button } from "@/shared/components/ui/button"
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/shared/components/ui/dialog"
-import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-} from "@/shared/components/ui/form"
-import { Input } from "@/shared/components/ui/input"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/shared/components/ui/form"
 import { Textarea } from "@/shared/components/ui/textarea"
+import { DialogShell } from "@/shared/components/dialog-shell.component"
 import useGetCashPaymentMethods from "../hooks/useGetCashPaymentMethods.hook"
 import usePatchCashSession from "../hooks/usePatchCashSession.hook"
 import { calculateCashCount } from "../services/calculateCashCount.service"
 import { type CashSessionWithPayments } from "../types/cash-session.type"
 import CashCountBreakdown from "./cash-count-breakdown.component"
-import CashCountDifference from "./cash-count-difference.component"
+import { CashDifferencePanel } from "./cash-difference-panel.component"
+import { MoneyAmountInput } from "./money-amount-input.component"
 
 const closeCashSessionSchema = z.object({
     counted_amount: z
-        .number({ error: "El monto contado debe ser 0 o mayor" })
-        .refine((value) => value >= 0, "El monto contado debe ser 0 o mayor"),
+        .number({ error: "Cargá lo que contaste. Si no hay nada en el cajón, poné 0." })
+        .refine((value) => value >= 0, "Cargá lo que contaste. Si no hay nada en el cajón, poné 0."),
     note: z.string().trim().max(500, "La nota es demasiado larga"),
 })
 
@@ -58,11 +45,11 @@ interface CloseCashSessionDialogProps {
     session: CashSessionWithPayments | null
 }
 
-export default function CloseCashSessionDialog({
-    open,
-    onOpenChange,
-    session,
-}: CloseCashSessionDialogProps) {
+/**
+ * Protagonista: la diferencia en vivo, mientras se escribe el contado real. Nunca bloquea el
+ * cierre, por grande que sea (PLAN-UI/vistas/admin-cash.md): "Cerrar caja" siempre está habilitado.
+ */
+export default function CloseCashSessionDialog({ open, onOpenChange, session }: CloseCashSessionDialogProps) {
     const patchCashSession = usePatchCashSession()
     const { paymentMethods, cashPaymentMethodIds } = useGetCashPaymentMethods()
 
@@ -101,32 +88,43 @@ export default function CloseCashSessionDialog({
         })
     }
 
+    const submitting = patchCashSession.isPending
+
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>Cerrar caja</DialogTitle>
-                    <DialogDescription>
-                        Contá la plata del cajón y compará con lo esperado. Solo el efectivo entra al arqueo.
-                    </DialogDescription>
-                </DialogHeader>
-
-                <CashCountBreakdown count={count} />
-
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <DialogShell
+            open={open}
+            onOpenChange={onOpenChange}
+            title="Cerrar caja"
+            description="Contá la plata del cajón y compará con lo esperado. Solo el efectivo entra al arqueo."
+            mobileBarTitle="Cerrar caja"
+            widthClass="sm:max-w-[700px]"
+            footer={
+                <>
+                    <Button type="button" variant="outline" className="hidden h-10 sm:inline-flex" onClick={() => onOpenChange(false)} disabled={submitting}>
+                        Cancelar
+                    </Button>
+                    <Button type="submit" form="close-cash-session-form" disabled={submitting} className="h-12 w-full gap-2 sm:h-10 sm:w-auto">
+                        {submitting
+                            ? (<><Loader2 className="size-4 animate-spin" aria-hidden /> Cerrando…</>)
+                            : (<><LockKeyhole className="size-4" aria-hidden /> Cerrar caja</>)}
+                    </Button>
+                </>
+            }
+        >
+            <Form {...form}>
+                <form id="close-cash-session-form" onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+                    <div className="grid items-start gap-4 sm:grid-cols-2 sm:gap-x-6">
                         <FormField
                             control={form.control}
                             name="counted_amount"
-                            render={({ field }) => (
-                                <FormItem>
+                            render={({ field, fieldState }) => (
+                                <FormItem className="sm:col-start-2 sm:row-start-1">
                                     <FormLabel>Contado real</FormLabel>
                                     <FormControl>
-                                        <Input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
+                                        <MoneyAmountInput
+                                            large
                                             autoFocus
+                                            invalid={!!fieldState.error}
                                             name={field.name}
                                             ref={field.ref}
                                             onBlur={field.onBlur}
@@ -136,43 +134,47 @@ export default function CloseCashSessionDialog({
                                             )}
                                         />
                                     </FormControl>
+                                    {!fieldState.error && (
+                                        <p className="text-muted-foreground text-sm">Solo el efectivo del cajón: billetes y monedas.</p>
+                                    )}
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
 
-                        {count.difference !== null && (
-                            <div className="flex items-center justify-between rounded-lg border p-3">
-                                <span className="text-sm text-muted-foreground">Diferencia</span>
-                                <CashCountDifference difference={count.difference} className="text-lg font-semibold" />
-                            </div>
-                        )}
+                        <div className="sm:col-start-2 sm:row-start-2">
+                            <CashDifferencePanel
+                                difference={count.difference}
+                                counted={count.countedAmount}
+                                expected={count.expectedAmount}
+                            />
+                        </div>
+
+                        <div className="flex flex-col gap-2 sm:col-start-1 sm:row-span-3 sm:row-start-1">
+                            <span className="hidden text-sm font-semibold sm:block">Desglose de esta caja</span>
+                            <CashCountBreakdown count={count} />
+                        </div>
 
                         <FormField
                             control={form.control}
                             name="note"
                             render={({ field }) => (
-                                <FormItem>
+                                <FormItem className="sm:col-start-2 sm:row-start-3">
                                     <FormLabel>Nota (opcional)</FormLabel>
                                     <FormControl>
-                                        <Textarea rows={2} placeholder="Faltó un vuelto" {...field} />
+                                        <Textarea rows={2} placeholder="Ej.: faltó un vuelto del mediodía" {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
+                    </div>
 
-                        <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                                Cancelar
-                            </Button>
-                            <Button type="submit" disabled={patchCashSession.isPending}>
-                                Cerrar caja
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </Form>
-            </DialogContent>
-        </Dialog>
+                    <p className="text-xs text-muted-foreground sm:text-sm">
+                        La diferencia no frena el cierre: queda registrada tal cual.
+                    </p>
+                </form>
+            </Form>
+        </DialogShell>
     )
 }

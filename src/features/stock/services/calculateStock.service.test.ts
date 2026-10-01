@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
     isBelowMinimum,
     resolveMovementQuantity,
+    resolveStockStatus,
     sumStockMovements,
 } from "./calculateStock.service"
 
@@ -70,5 +71,20 @@ describe("isBelowMinimum", () => {
     it("no marca el insumo cuando el stock iguala o supera el mínimo", () => {
         expect(isBelowMinimum(2000, 2000)).toBe(false)
         expect(isBelowMinimum(2500, 2000)).toBe(false)
+    })
+})
+
+describe("resolveStockStatus", () => {
+    it("negativo tiene prioridad sobre bajo mínimo", () => {
+        expect(resolveStockStatus(-5, 2000)).toBe("negative")
+    })
+
+    it("marca bajo mínimo cuando no llega al mínimo pero no es negativo", () => {
+        expect(resolveStockStatus(1200, 2000)).toBe("low")
+    })
+
+    it("está en orden cuando el stock iguala o supera el mínimo", () => {
+        expect(resolveStockStatus(2000, 2000)).toBe("ok")
+        expect(resolveStockStatus(2500, 2000)).toBe("ok")
     })
 })

@@ -1,24 +1,16 @@
 import { buildProductCostings } from "@/features/costing/services/calculateProductCosting.service"
-import { resolveMonthRange } from "@/features/costing/services/resolveMonthRange.service"
 import { resolveSupplyUnitCost } from "@/features/costing/services/resolveSupplyUnitCost.service"
-import {
-    calculateWastePercentage,
-    type CostedMovement,
-} from "@/features/costing/services/calculateWastePercentage.service"
 import { loadCostingContext } from "@/features/costing/server/costing-context"
+import { loadMeasuredWaste } from "@/features/costing/server/measured-parameters"
 import {
     type CostableProduct,
     type CostingReport,
 } from "@/features/costing/types/costing.type"
-import { calculateFixedCostTotal } from "@/features/fixed-costs/services/calculateFixedCostTotal.service"
-import { toPeriodDate } from "@/features/fixed-costs/services/resolvePeriod.service"
-import { type StockMovementType } from "@/features/stock/types/stock.type"
 import {
     type SupplyOrigin,
     type SupplyType,
     type SupplyUnit,
 } from "@/features/supplies/types/supply.type"
-import { type TaxContext } from "@/features/taxes/types/tax.type"
 import { ApiError } from "@/server/api/api-error"
 import { authenticatedRoute } from "@/server/api/handler"
 import { getServerSupabase } from "@/server/supabase"
@@ -29,11 +21,8 @@ export const runtime = "nodejs"
 
 const MONTH_PATTERN = /^\d{4}-\d{2}$/
 
-const COSTED_MOVEMENT_TYPES: StockMovementType[] = ["waste", "sale", "production_out"]
-
 const fetchCostableProducts = async (
     search: string | null,
-    tax: TaxContext,
 ): Promise<CostableProduct[]> => {
     const query = getServerSupabase()
         .from("product")
@@ -75,49 +64,9 @@ const fetchCostableProducts = async (
                     purchase_price: line.supply.purchase_price,
                     yield_factor: line.supply.yield_factor,
                     last_production_unit_cost: lastCosts.get(line.supply_id) ?? null,
-                }, tax),
+                }),
             })),
     }))
-}
-
-const fetchMonthlySoldUnits = async (month: string): Promise<number> => {
-    const { from, to } = resolveMonthRange(month)
-
-    const { data, error } = await getServerSupabase()
-        .from("sale_item")
-        .select("quantity, sale!inner(created_at)")
-        .gte("sale.created_at", from)
-        .lt("sale.created_at", to)
-
-    if (error) throw new Error(error.message)
-
-    return (data ?? []).reduce((units, item) => units + item.quantity, 0)
-}
-
-const fetchCostedMovements = async (month: string): Promise<CostedMovement[]> => {
-    const { from, to } = resolveMonthRange(month)
-
-    const { data, error } = await getServerSupabase()
-        .from("stock_movement")
-        .select("type, quantity, unit_cost")
-        .in("type", COSTED_MOVEMENT_TYPES)
-        .gte("created_at", from)
-        .lt("created_at", to)
-
-    if (error) throw new Error(error.message)
-
-    return (data ?? []) as CostedMovement[]
-}
-
-const fetchFixedCostTotal = async (month: string): Promise<number> => {
-    const { data, error } = await getServerSupabase()
-        .from("fixed_cost")
-        .select("amount")
-        .eq("period", toPeriodDate(month))
-
-    if (error) throw new Error(error.message)
-
-    return calculateFixedCostTotal(data ?? [])
 }
 
 export const GET = authenticatedRoute({}, async ({ request }): Promise<CostingReport> => {
@@ -128,29 +77,26 @@ export const GET = authenticatedRoute({}, async ({ request }): Promise<CostingRe
         throw new ApiError(400, "El mes debe tener el formato AAAA-MM")
     }
 
-    const context = await loadCostingContext(month)
+    const context = await loadCostingContext()
 
-    const [fixedCostTotal, soldUnits, movements, products] = await Promise.all([
-        fetchFixedCostTotal(month),
-        fetchMonthlySoldUnits(month),
-        fetchCostedMovements(month),
-        fetchCostableProducts(params.get("search")?.trim() || null, context.tax),
+    // Los costos fijos ya no se reparten por plato (ver PLAN/04-costos-fijos.md):
+    // el reporte de costeo no necesita el total de fijos ni las unidades vendidas
+    // del mes, solo lo que cuesta y deja cada plato.
+    const [measuredWaste, products] = await Promise.all([
+        loadMeasuredWaste(month, context.waste_percentages),
+        fetchCostableProducts(params.get("search")?.trim() || null),
     ])
 
     try {
         return {
             ...context,
             month,
-            sold_units: soldUnits,
-            fixed_cost_total: fixedCostTotal,
             // Lo medido es un indicador, no un parámetro: el costeo usa los
-            // porcentajes configurados para que un corte de luz no mueva el costo
+            // porcentajes declarados para que un corte de luz no mueva el costo
             // del plato.
-            measured_waste: calculateWastePercentage(movements, context.waste_percentages.food),
+            measured_waste: measuredWaste,
             rows: buildProductCostings(products, {
                 wastePercentages: context.waste_percentages,
-                fixedCostPerUnit: context.fixed_cost_per_unit.amount_per_unit,
-                tax: context.tax,
             }),
         }
     } catch (error) {

@@ -2,13 +2,12 @@ import { type PatchConfigInput } from "@/features/admin/hooks/usePatchConfig.hoo
 import { type ConfigPos } from "@/features/admin/types/config.type"
 import { type CashMovement, type CashMovementType } from "@/features/cash/types/cash-movement.type"
 import { type CashSession, type CashSessionWithPayments } from "@/features/cash/types/cash-session.type"
-import { type CostingReport } from "@/features/costing/types/costing.type"
+import { type CostingReport, type MeasuredParameters } from "@/features/costing/types/costing.type"
 import { type Order, type OrderStatus } from "@/features/order/types/sale.type"
 import { type Payment } from "@/features/payment/types/payment.type"
 import { type Product } from "@/features/products/types/product.type"
 import { type StockMovement, type SupplyStock } from "@/features/stock/types/stock.type"
 import { type Supply } from "@/features/supplies/types/supply.type"
-import { type Tax, type TaxInput } from "@/features/taxes/types/tax.type"
 import { type ApiClient } from "./api-client"
 
 export type OrderLine = { product_id: number; quantity: number }
@@ -49,35 +48,6 @@ export const patchProductTargetMargin = (
 ): Promise<unknown> => client.patch(`/api/products/${productId}`, {
     values: { target_margin_percentage: targetMarginPercentage },
 })
-
-export const listTaxes = (client: ApiClient): Promise<Tax[]> => client.get<Tax[]>("/api/taxes")
-
-export const createTax = (
-    client: ApiClient,
-    input: Partial<TaxInput> & Pick<TaxInput, "name" | "type">,
-): Promise<Tax> => client.post<Tax>("/api/taxes", input)
-
-export const patchTax = (
-    client: ApiClient,
-    input: Partial<TaxInput> & { id: number },
-): Promise<Tax> => client.patch<Tax>("/api/taxes", input)
-
-export const deleteTax = (client: ApiClient, id: number): Promise<{ id: number }> =>
-    client.delete<{ id: number }>("/api/taxes", { id })
-
-/**
- * Deja la tabla de impuestos sin ninguno activo y devuelve cómo volver a dejarla
- * como estaba: cada flujo parte de un costeo sin impuestos y carga los suyos.
- */
-export const suspendTaxes = async (client: ApiClient): Promise<() => Promise<void>> => {
-    const active = (await listTaxes(client)).filter((tax) => tax.is_active)
-
-    for (const tax of active) await patchTax(client, { id: tax.id, is_active: false })
-
-    return async () => {
-        for (const tax of active) await patchTax(client, { id: tax.id, is_active: true })
-    }
-}
 
 export const findSupply = async (client: ApiClient, name: string): Promise<Supply> => {
     const supply = (await listSupplies(client)).find((item) => item.name === name)
@@ -234,6 +204,13 @@ export const registerAdjustment = (
 
 export const readCosting = (client: ApiClient, month: string): Promise<CostingReport> =>
     client.get<CostingReport>(`/api/costing?month=${month}`)
+
+/** Lo medido del período, el lado que las pantallas muestran al lado de lo declarado. */
+export const readMeasuredParameters = (
+    client: ApiClient,
+    month: string,
+): Promise<MeasuredParameters> =>
+    client.get<MeasuredParameters>(`/api/costing/measured?month=${month}`)
 
 /** El costo con el que la API valúa un insumo comprado: precio sobre rendimiento. */
 export const supplyUnitCost = (supply: Supply): number => supply.purchase_price / supply.yield_factor

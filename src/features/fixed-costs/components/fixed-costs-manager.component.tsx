@@ -3,21 +3,10 @@
 import { Plus } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
-import { Loader } from "@/shared/components/loader.component"
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/shared/components/ui/alert-dialog"
 import { Button } from "@/shared/components/ui/button"
-import { Input } from "@/shared/components/ui/input"
-import { Label } from "@/shared/components/ui/label"
-import formatCurrency from "@/shared/utils/formatCurrency.util"
+import { ConfirmDialog } from "@/shared/components/confirm-dialog.component"
+import { MonthPicker } from "@/shared/components/month-picker.component"
+import { PageHeader } from "@/shared/components/page-header.component"
 import useDeleteFixedCost from "../hooks/useDeleteFixedCost.hook"
 import useGetFixedCosts from "../hooks/useGetFixedCosts.hook"
 import { calculateFixedCostTotal } from "../services/calculateFixedCostTotal.service"
@@ -25,7 +14,13 @@ import { currentMonth, formatPeriod, toPeriodDate } from "../services/resolvePer
 import { type FixedCost } from "../types/fixed-cost.type"
 import FixedCostFormDialog from "./fixed-cost-form-dialog.component"
 import FixedCostTable from "./fixed-cost-table.component"
+import RequiredSales from "./required-sales.component"
 
+/**
+ * Orden deliberado (PLAN-UI/vistas/admin-fixed-costs.md): 1) bloque "Necesitás
+ * vender" (responde la pregunta de toda la pantalla) · 2) encabezado · 3) mes +
+ * total · 4) tabla de costos fijos (soporte, no protagonista).
+ */
 export default function FixedCostsManager() {
     const [month, setMonth] = useState(currentMonth())
     const [editingFixedCost, setEditingFixedCost] = useState<FixedCost | null>(null)
@@ -34,6 +29,7 @@ export default function FixedCostsManager() {
 
     const { data: fixedCosts, isLoading } = useGetFixedCosts(month)
     const deleteFixedCost = useDeleteFixedCost()
+    const monthTotal = calculateFixedCostTotal(fixedCosts ?? [])
 
     const openCreateForm = () => {
         setEditingFixedCost(null)
@@ -53,56 +49,39 @@ export default function FixedCostsManager() {
                 toast.success("Costo fijo eliminado")
                 setFixedCostToDelete(null)
             },
+            onError: (error) => toast.error(error.message),
         })
     }
 
     return (
         <div className="flex flex-col gap-6">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold">Costos fijos</h1>
-                    <p className="text-sm text-muted-foreground">
-                        Gastos mensuales del negocio. Se reparten entre los productos recién cuando
-                        el mes cierra, con las unidades que se vendieron.
-                    </p>
-                </div>
-                <Button onClick={openCreateForm}>
-                    <Plus className="h-4 w-4" />
-                    Nuevo costo fijo
-                </Button>
-            </div>
+            <RequiredSales fixedCostTotal={monthTotal} month={month} />
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div className="flex flex-col gap-2">
-                    <Label htmlFor="fixed-cost-month">Mes</Label>
-                    <Input
-                        id="fixed-cost-month"
-                        type="month"
-                        className="w-full sm:w-48"
-                        value={month}
-                        onChange={(event) => event.target.value && setMonth(event.target.value)}
-                    />
-                </div>
+            <PageHeader
+                title="Costos fijos"
+                description="Gastos mensuales del negocio. De acá sale cuánto necesitás vender para cubrirlos."
+                actions={
+                    <Button size="lg" className="h-11 gap-2 md:h-12 md:px-5 md:text-base" onClick={openCreateForm}>
+                        <Plus className="size-5" aria-hidden />
+                        <span className="md:hidden">Nuevo</span>
+                        <span className="hidden md:inline">Nuevo costo fijo</span>
+                    </Button>
+                }
+            />
 
-                <div className="rounded-lg border bg-muted/40 p-3">
-                    <p className="text-sm text-muted-foreground">
-                        Total de {formatPeriod(toPeriodDate(month))}
-                    </p>
-                    <p className="text-lg font-semibold">
-                        {formatCurrency(calculateFixedCostTotal(fixedCosts ?? []))}
-                    </p>
-                </div>
-            </div>
+            <MonthPicker
+                value={month}
+                onChange={setMonth}
+                totalLabel={`Total de ${formatPeriod(toPeriodDate(month))}`}
+                total={monthTotal}
+            />
 
-            {isLoading
-                ? <Loader className="h-64" />
-                : (
-                    <FixedCostTable
-                        fixedCosts={fixedCosts ?? []}
-                        onEdit={openEditForm}
-                        onDelete={setFixedCostToDelete}
-                    />
-                )}
+            <FixedCostTable
+                fixedCosts={fixedCosts ?? []}
+                isLoading={isLoading}
+                onEdit={openEditForm}
+                onDelete={setFixedCostToDelete}
+            />
 
             <FixedCostFormDialog
                 open={isFormOpen}
@@ -111,24 +90,17 @@ export default function FixedCostsManager() {
                 defaultMonth={month}
             />
 
-            <AlertDialog
+            <ConfirmDialog
                 open={!!fixedCostToDelete}
-                onOpenChange={(open) => !open && setFixedCostToDelete(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Eliminar costo fijo</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            {`"${fixedCostToDelete?.concept}" se borra del mes y deja de sumar al total.`}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={confirmDelete} disabled={deleteFixedCost.isPending}>
-                            Confirmar
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                onOpenChange={(open) => !open && setFixedCostToDelete(null)}
+                onConfirm={confirmDelete}
+                title="Eliminar costo fijo"
+                description={`"${fixedCostToDelete?.concept}" se borra del mes y deja de sumar al total.`}
+                confirmLabel="Confirmar"
+                destructive
+                pending={deleteFixedCost.isPending}
+                pendingLabel="Eliminando…"
+            />
         </div>
     )
 }
