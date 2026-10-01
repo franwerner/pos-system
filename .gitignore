@@ -29,3 +29,12 @@ next-env.d.ts
 
 # verification artifacts
 proofshot-artifacts/
+
+# local planning, design handoff and tooling
+.atl/
+.codegraph/
+Design/
+PLAN/
+PLAN-UI/
+task.md
+task-api.md
