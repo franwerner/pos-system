@@ -7,7 +7,7 @@
     "dev": "next dev --turbo",
     "lint": "eslint .",
     "start": "next start",
-    "generated-types": "npx supabase gen types typescript --project-id exwiunrndlmfwhbkjrhs --schema public > src/shared/types/database.types.ts",
+    "generated-types": "npx supabase gen types typescript --project-id oabiymeigvrineswtsnq --schema public > src/shared/types/database.types.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:flow": "vitest run --config vitest.config.e2e.ts",

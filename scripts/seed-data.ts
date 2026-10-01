@@ -49,7 +49,7 @@ const clear = async () => {
     }
 
     // app_config y payment_method se actualizan en vez de borrarse: la config es un
-    // singleton con id=1 y los métodos de pago los referencian las ventas ya cobradas.
+    // singleton (una sola fila) y los métodos de pago los referencian las ventas ya cobradas.
     const { error } = await supabase.from("payment_method").delete().gte("id", 0)
 
     if (error) throw new Error(`No se pudo limpiar payment_method: ${error.message}`)
@@ -63,12 +63,16 @@ const seedPaymentMethods = async () =>
             // tarjetas van en 0 y lo que se ofrece es descuento por efectivo: en Argentina
             // no se puede cobrar más caro por pagar con tarjeta. Las cuotas sí recargan:
             // es financiación que el cliente elige aparte.
+            //
+            // `expected_share` es la mezcla declarada de medios de pago: con cuánto de
+            // las ventas espera cobrar el negocio en cada uno. Suma 100 y es lo que
+            // pondera las comisiones en el costeo.
             .insert([
-                { name: "Efectivo", tax: -10 },
-                { name: "Débito", tax: 0 },
-                { name: "Crédito", tax: 0 },
-                { name: "Transferencia", tax: 0 },
-                { name: "Crédito 3 cuotas", tax: 18 },
+                { name: "Efectivo", tax: -10, expected_share: 40 },
+                { name: "Débito", tax: 0, expected_share: 20 },
+                { name: "Crédito", tax: 0, expected_share: 30 },
+                { name: "Transferencia", tax: 0, expected_share: 10 },
+                { name: "Crédito 3 cuotas", tax: 18, expected_share: 0 },
             ])
             .select("id, name"),
     )
@@ -281,15 +285,26 @@ const main = async () => {
     if (fixedCostError) throw new Error(fixedCostError.message)
 
     console.log("Configuración…")
-    const { error: configError } = await supabase
+    const configValues = {
+        default_payment_id: cash.id,
+        waste_percentage_food: 4,
+        waste_percentage_drink: 1,
+        waste_percentage_packaging: 0,
+    }
+    // Las migraciones crean la tabla pero no la fila: en una base recién creada no hay
+    // nada que actualizar. El id es GENERATED ALWAYS, así que no se puede forzar id=1
+    // con un upsert: se actualiza la fila que haya o se crea la primera.
+    const { data: existingConfig, error: readConfigError } = await supabase
         .from("app_config")
-        .update({
-            default_payment_id: cash.id,
-            waste_percentage_food: 4,
-            waste_percentage_drink: 1,
-            waste_percentage_packaging: 0,
-        })
-        .eq("id", 1)
+        .select("id")
+        .limit(1)
+        .maybeSingle()
+
+    if (readConfigError) throw new Error(readConfigError.message)
+
+    const { error: configError } = existingConfig
+        ? await supabase.from("app_config").update(configValues).eq("id", existingConfig.id)
+        : await supabase.from("app_config").insert(configValues)
 
     if (configError) throw new Error(configError.message)
 
